@@ -1,8 +1,11 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 
 export type Category = 'Vegetable' | 'Chilli' | 'Fruit' | 'Herb' | 'Leafy';
 export type Stage = 'Seedling' | 'Growing' | 'Flowering' | 'Fruiting' | 'Dormant';
+export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
 
 export interface LibraryPlant {
   id: string; name: string; scientific: string; category: Category;
@@ -63,11 +66,15 @@ export function getSmartFeed(plant: Plant, ferts: Fertilizer[]) {
   const needsBoost = plant.stage === 'Flowering' || plant.stage === 'Fruiting';
   const boost = needsBoost ? ferts.find(f => f.feedType === 'Potash Boost' && (f.targets.includes(plant.category) || f.targets.includes('All'))) || null : null;
   const dose = primary ? (isPot ? primary.potDosage : primary.bedDosage) : '';
-  return { primary, boost, note: `${isPot ? 'Pot' : 'Bed'} dose: ${dose}${boost ? ` + ${boost.name} for ${plant.stage.toLowerCase()}` : ''}` };
+  return { primary, boost, note: `${isPot ? 'Pot' : 'Bed'} dose: ${dose}${boost ? ` + ${boost.name} for${plant.stage.toLowerCase()}` : ''}` };
 }
 
 interface GardenContextType {
   plants: Plant[]; fertilizers: Fertilizer[]; seeds: SeedItem[]; harvests: HarvestLog[]; expenses: ExpenseLog[]; reminders: Reminder[];
+  user: User | null; syncStatus: SyncStatus;
+  signUp: (email: string, password: string) => Promise<string | null>;
+  signIn: (email: string, password: string) => Promise<string | null>;
+  signOut: () => Promise<void>;
   addPlant: (p: Omit<Plant, 'id'>) => void; updatePlantQty: (id: string, delta: number) => void;
   cyclePlantStage: (id: string) => void; deletePlant: (id: string) => void;
   waterPlant: (id: string) => void; feedPlant: (id: string) => void; waterAll: () => void; feedAll: () => void;
@@ -92,6 +99,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  const [user, setUser] = useState<User | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('local');
+  const skipNextPush = useRef(false);
+
+  // Load local backup first
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then(raw => {
       if (raw) {
@@ -105,86 +117,83 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Listen to Supabase auth session
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  // Pull cloud garden when user signs in
+  useEffect(() => {
+    if (!loaded || !user) {
+      setSyncStatus('local');
+      return;
+    }
+    let active = true;
+    (async () => {
+      setSyncStatus('syncing');
+      const { data, error } = await supabase
+        .from('gardens')
+        .select('data')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!active) return;
+      if (error) {
+        setSyncStatus('error');
+        return;
+      }
+
+      const cloud = data?.data as any;
+      const hasCloudData = cloud && ((cloud.plants?.length || 0) > 0 || (cloud.seeds?.length || 0) > 0 || (cloud.harvests?.length || 0) > 0);
+      if (hasCloudData) {
+        skipNextPush.current = true;
+        setPlants(cloud.plants || []);
+        setFertilizers(cloud.fertilizers || []);
+        setSeeds(cloud.seeds || []);
+        setHarvests(cloud.harvests || []);
+        setExpenses(cloud.expenses || []);
+        setReminders(cloud.reminders || []);
+        setSyncStatus('synced');
+      } else {
+        // Upload existing local garden to cloud on first sign-in
+        const payload = { plants, fertilizers, seeds, harvests, expenses, reminders };
+        const { error: upErr } = await supabase
+          .from('gardens')
+          .upsert({ user_id: user.id, data: payload, updated_at: new Date().toISOString() });
+        setSyncStatus(upErr ? 'error' : 'synced');
+      }
+    })();
+    return () => { active = false; };
+  }, [user, loaded]);
+
+  // Save locally + auto-sync to Supabase when signed in
   useEffect(() => {
     if (!loaded) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ plants, fertilizers, seeds, harvests, expenses, reminders }));
-  }, [plants, fertilizers, seeds, harvests, expenses, reminders, loaded]);
+    const payload = { plants, fertilizers, seeds, harvests, expenses, reminders };
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
-  const today = () => new Date().toISOString().slice(0, 10);
-  const uid = () => Math.random().toString(36).slice(2, 9);
-  const stages: Stage[] = ['Seedling', 'Growing', 'Flowering', 'Fruiting', 'Dormant'];
+    if (!user) return;
+    if (skipNextPush.current) {
+      skipNextPush.current = false;
+      return;
+    }
 
-  const addPlant = (p: Omit<Plant, 'id'>) => setPlants(prev => [{ ...p, id: uid() }, ...prev]);
-  const updatePlantQty = (id: string, delta: number) => setPlants(prev => prev.map(p => p.id === id ? { ...p, quantity: Math.max(1, p.quantity + delta) } : p));
-  const cyclePlantStage = (id: string) => setPlants(prev => prev.map(p => p.id === id ? { ...p, stage: stages[(stages.indexOf(p.stage) + 1) % stages.length] } : p));
-  const deletePlant = (id: string) => setPlants(prev => prev.filter(p => p.id !== id));
-  const waterPlant = (id: string) => setPlants(prev => prev.map(p => p.id === id ? { ...p, lastWatered: today() } : p));
-  const feedPlant = (id: string) => setPlants(prev => prev.map(p => p.id === id ? { ...p, lastFed: today() } : p));
-  const waterAll = () => setPlants(prev => prev.map(p => ({ ...p, lastWatered: today() })));
-  const feedAll = () => setPlants(prev => prev.map(p => p.stage === 'Dormant' ? p : { ...p, lastFed: today() }));
-  const addFertilizer = (f: Omit<Fertilizer, 'id'>) => setFertilizers(prev => [{ ...f, id: uid() }, ...prev]);
-  const deleteFertilizer = (id: string) => setFertilizers(prev => prev.filter(f => f.id !== id));
-  const addSeed = (s: Omit<SeedItem, 'id'>) => setSeeds(prev => [{ ...s, id: uid() }, ...prev]);
-  const updateSeedCount = (id: string, field: 'packets' | 'approxSeeds', delta: number) =>
-    setSeeds(prev => prev.map(s => s.id === id ? { ...s, [field]: Math.max(0, s[field] + delta) } : s));
-  const sowSeed = (id: string) => {
-    const s = seeds.find(x => x.id === id);
-    if (!s) return;
-    const m = PLANT_LIBRARY.find(l => s.name.toLowerCase().includes(l.name.toLowerCase()));
-    addPlant({ name: s.name, variety: s.variety || 'Standard', scientific: m?.scientific || '', category: m?.category || 'Vegetable', quantity: 1, site: 'Pots', stage: 'Seedling', potSize: m ? `${m.potMm}mm (${m.potL}L)` : '300mm (15L)', idealTemp: m ? `${m.tempMin}–${m.tempMax}°C` : '16–28°C', waterEveryDays: 2 });
-    updateSeedCount(id, 'approxSeeds', -5);
-  };
-  const deleteSeed = (id: string) => setSeeds(prev => prev.filter(s => s.id !== id));
-  const addHarvest = (crop: string, grams: number, valueAud?: number) => {
-    const m = PLANT_LIBRARY.find(l => crop.toLowerCase().includes(l.name.toLowerCase()));
-    const est = valueAud ?? Number(((grams / 1000) * (m?.audPerKg || 8)).toFixed(2));
-    setHarvests(prev => [{ id: uid(), crop, grams, valueAud: est, date: today() }, ...prev]);
-  };
-  const addExpense = (item: string, category: string, costAud: number) => setExpenses(prev => [{ id: uid(), item, category, costAud, date: today() }, ...prev]);
-  const addReminder = (title: string, due: string) => setReminders(prev => [{ id: uid(), title, due, done: false }, ...prev]);
-  const toggleReminder = (id: string) => setReminders(prev => prev.map(r => r.id === id ? { ...r, done: !r.done } : r));
+    setSyncStatus('syncing');
+    const timer = setTimeout(async () => {
+      const { error } = await supabase
+        .from('gardens')
+        .upsert({ user_id: user.id, data: payload, updated_at: new Date().toISOString() });
+      setSyncStatus(error ? 'error' : 'synced');
+    }, 600);
 
-  const loadSampleGarden = () => {
-    setPlants([
-      { id: uid(), name: 'Tomato', variety: 'Tommy Toe', scientific: 'Solanum lycopersicum', category: 'Vegetable', quantity: 4, site: 'Raised Beds', stage: 'Fruiting', potSize: '400mm (35L)', idealTemp: '18–29°C', waterEveryDays: 2, lastWatered: today() },
-      { id: uid(), name: 'Chilli', variety: 'Jalapeño', scientific: 'Capsicum annuum', category: 'Chilli', quantity: 3, site: 'Pots', stage: 'Flowering', potSize: '350mm (20L)', idealTemp: '20–32°C', waterEveryDays: 2 },
-      { id: uid(), name: 'Dwarf Meyer Lemon', variety: 'Meyer', scientific: 'Citrus × meyeri', category: 'Fruit', quantity: 1, site: 'Pots', stage: 'Fruiting', potSize: '500mm (60L)', idealTemp: '15–30°C', waterEveryDays: 3 },
-      { id: uid(), name: 'Strawberry', variety: 'Albion', scientific: 'Fragaria × ananassa', category: 'Fruit', quantity: 6, site: 'Standing Bed', stage: 'Fruiting', potSize: '250mm (10L)', idealTemp: '14–26°C', waterEveryDays: 2 },
-      { id: uid(), name: 'Spinach', variety: 'Ironman', scientific: 'Spinacia oleracea', category: 'Leafy', quantity: 8, site: 'Raised Beds', stage: 'Growing', potSize: '250mm (10L)', idealTemp: '10–22°C', waterEveryDays: 2 },
-      { id: uid(), name: 'Bok Choy', variety: 'Shanghai', scientific: 'Brassica rapa', category: 'Leafy', quantity: 5, site: 'Front Yard', stage: 'Seedling', potSize: '250mm (10L)', idealTemp: '12–24°C', waterEveryDays: 2 },
-    ]);
-    setFertilizers(AUSSIE_FERT_PRESETS.slice(0, 4).map(f => ({ ...f, id: uid() })));
-    setSeeds([
-      { id: uid(), name: 'Tomato', variety: 'Black Krim', packets: 2, approxSeeds: 60, season: 'Spring/Summer', wishlist: false },
-      { id: uid(), name: 'Chilli', variety: 'Carolina Reaper', packets: 1, approxSeeds: 15, season: 'Spring', wishlist: false },
-      { id: uid(), name: 'Zucchini', variety: 'Gold Max', packets: 1, approxSeeds: 20, season: 'Spring/Summer', wishlist: false },
-      { id: uid(), name: 'Blueberry', variety: 'Sunshine Blue', packets: 0, approxSeeds: 0, season: 'Winter/Spring', wishlist: true },
-    ]);
-    setHarvests([
-      { id: uid(), crop: 'Tommy Toe Tomato', grams: 850, valueAud: 6.38, date: today() },
-      { id: uid(), crop: 'Strawberry', grams: 400, valueAud: 6.40, date: today() },
-    ]);
-    setExpenses([{ id: uid(), item: 'Sugar Cane Mulch Bale', category: 'Soil', costAud: 16.00, date: today() }]);
-    setReminders([
-      { id: uid(), title: 'Deep soak pots before 38°C afternoon', due: 'Today 7:00 AM', done: false },
-      { id: uid(), title: 'Feed fruiting tomatoes with Potash', due: 'Sunday', done: false },
-    ]);
-  };
+    return () => clearTimeout(timer);
+  }, [plants, fertilizers, seeds, harvests, expenses, reminders, loaded, user]);
 
-  return (
-    <GardenContext.Provider value={{
-      plants, fertilizers, seeds, harvests, expenses, reminders,
-      addPlant, updatePlantQty, cyclePlantStage, deletePlant, waterPlant, feedPlant, waterAll, feedAll,
-      addFertilizer, deleteFertilizer, addSeed, updateSeedCount, sowSeed, deleteSeed,
-      addHarvest, addExpense, addReminder, toggleReminder, loadSampleGarden,
-    }}>
-      {children}
-    </GardenContext.Provider>
-  );
-}
-
-export function useGarden() {
-  const ctx = useContext(GardenContext);
-  if (!ctx) throw new Error('useGarden must be inside GardenProvider');
-  return ctx;
-}
+  const signUp = async (email: string, password: string) => {
+    const { error } = await supabase
