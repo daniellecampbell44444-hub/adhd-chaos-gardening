@@ -1,23 +1,71 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useGarden } from '../../context/GardenContext';
 
-const SEASONS: Record<string, { range: string; tip: string }> = {
-  Spring: { range: '11–26°C', tip: 'Prime planting for tomatoes, chillies & cucumbers. Watch late Sept chilly nights.' },
-  Summer: { range: '18–40°C+', tip: '30% shade cloth on >38°C days. Water pots at dawn; pause granular fertiliser >35°C.' },
-  Autumn: { range: '11–25°C', tip: 'Best time to sow spinach, bok choy, carrots, beetroot & snow peas.' },
-  Winter: { range: '2–17°C', tip: 'Light frosts possible in Western Sydney. Protect chillies & young citrus overnight.' },
-};
+interface WeatherData {
+  currentTemp: number;
+  humidity: number;
+  code: number;
+  todayMax: number;
+  todayMin: number;
+  todayRain: number;
+  tomorrowMax: number;
+  tomorrowMin: number;
+  tomorrowRain: number;
+  updatedAt: string;
+}
+
+const WEATHER_URL =
+  'https://api.open-meteo.com/v1/forecast?latitude=-33.765&longitude=150.870&current=temperature_2m,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Australia%2FSydney&forecast_days=2';
+
+function describeWeather(code: number) {
+  if (code === 0) return { icon: '☀️', label: 'Clear skies' };
+  if (code <= 3) return { icon: '⛅', label: 'Partly cloudy' };
+  if (code <= 48) return { icon: '🌫️', label: 'Foggy' };
+  if (code <= 67) return { icon: '🌧️', label: 'Rain' };
+  if (code <= 82) return { icon: '🌦️', label: 'Showers' };
+  if (code >= 95) return { icon: '⛈️', label: 'Storms' };
+  return { icon: '🌤️', label: 'Mild' };
+}
 
 export default function PulseScreen() {
   const { plants, harvests, expenses, waterAll, feedAll, addHarvest, addExpense, loadSampleGarden } = useGarden();
-  const [season, setSeason] = useState<'Spring' | 'Summer' | 'Autumn' | 'Winter'>('Spring');
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [loadingWeather, setLoadingWeather] = useState(true);
   const [modal, setModal] = useState<'none' | 'harvest' | 'expense'>('none');
   const [crop, setCrop] = useState('');
   const [grams, setGrams] = useState('');
   const [expItem, setExpItem] = useState('');
   const [expCost, setExpCost] = useState('');
+
+  const fetchWeather = useCallback(async () => {
+    setLoadingWeather(true);
+    try {
+      const res = await fetch(WEATHER_URL);
+      const data = await res.json();
+      setWeather({
+        currentTemp: Math.round(data.current.temperature_2m),
+        humidity: Math.round(data.current.relative_humidity_2m),
+        code: data.current.weather_code,
+        todayMax: Math.round(data.daily.temperature_2m_max[0]),
+        todayMin: Math.round(data.daily.temperature_2m_min[0]),
+        todayRain: data.daily.precipitation_probability_max[0] ?? 0,
+        tomorrowMax: Math.round(data.daily.temperature_2m_max[1]),
+        tomorrowMin: Math.round(data.daily.temperature_2m_min[1]),
+        tomorrowRain: data.daily.precipitation_probability_max[1] ?? 0,
+        updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    } catch {
+      // Keeps previous weather or shows offline fallback
+    } finally {
+      setLoadingWeather(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWeather();
+  }, [fetchWeather]);
 
   const totalPlants = plants.reduce((s, p) => s + p.quantity, 0);
   const uniqueVarieties = new Set(plants.map(p => `${p.name}-${p.variety}`)).size;
@@ -26,6 +74,10 @@ export default function PulseScreen() {
   const totalSpent = expenses.reduce((s, e) => s + e.costAud, 0);
   const netSaved = totalEarned - totalSpent;
   const readyToPick = plants.filter(p => p.stage === 'Fruiting');
+
+  const peakMax = weather ? Math.max(weather.todayMax, weather.tomorrowMax) : 0;
+  const lowMin = weather ? Math.min(weather.todayMin, weather.tomorrowMin) : 99;
+  const highRain = weather ? Math.max(weather.todayRain, weather.tomorrowRain) : 0;
 
   const saveHarvest = () => {
     if (!crop.trim() || !Number(grams)) return;
@@ -39,20 +91,82 @@ export default function PulseScreen() {
     setExpItem(''); setExpCost(''); setModal('none');
   };
 
+  const wInfo = weather ? describeWeather(weather.code) : null;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text style={styles.heroTag}>WESTERN SYDNEY • NSW</Text>
-        <Text style={styles.heroTitle}>ADHD Chaos Gardening</Text>
-        <Text style={styles.heroSub}>{SEASONS[season].range} • {SEASONS[season].tip}</Text>
-        <View style={styles.seasonRow}>
-          {(['Spring', 'Summer', 'Autumn', 'Winter'] as const).map(s => (
-            <TouchableOpacity key={s} onPress={() => setSeason(s)} style={[styles.seasonPill, season === s && styles.seasonPillActive]}>
-              <Text style={[styles.seasonText, season === s && styles.seasonTextActive]}>{s}</Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.heroTop}>
+          <View>
+            <Text style={styles.heroTag}>WESTERN SYDNEY • LIVE</Text>
+            <Text style={styles.heroTitle}>ADHD Chaos Gardening</Text>
+          </View>
+          <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn}>
+            <Ionicons name="refresh" size={18} color="#dcfce7" />
+          </TouchableOpacity>
         </View>
+
+        {loadingWeather && !weather ? (
+          <View style={styles.weatherLoading}>
+            <ActivityIndicator color="#86efac" size="small" />
+            <Text style={styles.heroSub}>Checking Western Sydney forecast...</Text>
+          </View>
+        ) : weather && wInfo ? (
+          <View style={styles.weatherBox}>
+            <View style={styles.weatherMain}>
+              <Text style={styles.tempNow}>{wInfo.icon} {weather.currentTemp}°C</Text>
+              <View>
+                <Text style={styles.weatherLabel}>{wInfo.label} • {weather.humidity}% humidity</Text>
+                <Text style={styles.weatherSub}>
+                  Today: {weather.todayMin}°–{weather.todayMax}°C • 💧 {weather.todayRain}% rain
+                </Text>
+                <Text style={styles.weatherSub}>
+                  Tomorrow: {weather.tomorrowMin}°–{weather.tomorrowMax}°C • 💧 {weather.tomorrowRain}% rain
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.updatedTxt}>Updated {weather.updatedAt}</Text>
+          </View>
+        ) : (
+          <Text style={styles.heroSub}>Offline mode — tap refresh to load live weather.</Text>
+        )}
       </View>
+
+      {weather && peakMax >= 38 && (
+        <View style={[styles.alertCard, styles.alertHeat]}>
+          <Text style={styles.alertTitle}>🔥 HEATWAVE ALERT ({peakMax}°C forecast)</Text>
+          <Text style={styles.alertBody}>
+            Put up 30% shade cloth, deep-soak pots at dawn, and pause granular fertiliser until temps drop below 35°C.
+          </Text>
+        </View>
+      )}
+
+      {weather && peakMax >= 35 && peakMax < 38 && (
+        <View style={[styles.alertCard, styles.alertWarm]}>
+          <Text style={styles.alertTitle}>☀️ HOT DAY CARE ({peakMax}°C forecast)</Text>
+          <Text style={styles.alertBody}>
+            Water pots early morning and skip granular fertilisers today to avoid root burn.
+          </Text>
+        </View>
+      )}
+
+      {weather && lowMin <= 4 && (
+        <View style={[styles.alertCard, styles.alertFrost]}>
+          <Text style={styles.alertTitle}>❄️ FROST WATCH ({lowMin}°C overnight)</Text>
+          <Text style={styles.alertBody}>
+            Cover chillies, capsicums, basil, and young citrus tonight with frost cloth or move pots under shelter.
+          </Text>
+        </View>
+      )}
+
+      {weather && highRain >= 70 && (
+        <View style={[styles.alertCard, styles.alertRain]}>
+          <Text style={styles.alertTitle}>🌧️ RAIN INCOMING ({highRain}% chance)</Text>
+          <Text style={styles.alertBody}>
+            You can likely skip watering open raised beds—check pot saucers so roots don’t sit in water.
+          </Text>
+        </View>
+      )}
 
       <View style={styles.actionRow}>
         <TouchableOpacity style={styles.actionBtn} onPress={() => { waterAll(); Alert.alert('Watered!', 'All plants logged as watered today.'); }}>
@@ -148,14 +262,25 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0fdf4' },
   content: { padding: 16, gap: 14, paddingBottom: 32 },
   hero: { backgroundColor: '#14532d', borderRadius: 20, padding: 18 },
+  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   heroTag: { color: '#86efac', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  heroTitle: { color: '#ffffff', fontSize: 24, fontWeight: '800', marginTop: 4 },
-  heroSub: { color: '#dcfce7', fontSize: 13, marginTop: 6, lineHeight: 18 },
-  seasonRow: { flexDirection: 'row', gap: 6, marginTop: 12 },
-  seasonPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.14)' },
-  seasonPillActive: { backgroundColor: '#86efac' },
-  seasonText: { color: '#dcfce7', fontSize: 12, fontWeight: '600' },
-  seasonTextActive: { color: '#14532d' },
+  heroTitle: { color: '#ffffff', fontSize: 23, fontWeight: '800', marginTop: 3 },
+  heroSub: { color: '#dcfce7', fontSize: 13, marginTop: 8 },
+  refreshBtn: { backgroundColor: 'rgba(255,255,255,0.14)', padding: 8, borderRadius: 10 },
+  weatherLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  weatherBox: { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 14, padding: 12 },
+  weatherMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  tempNow: { color: '#ffffff', fontSize: 28, fontWeight: '800' },
+  weatherLabel: { color: '#bbf7d0', fontSize: 13, fontWeight: '700' },
+  weatherSub: { color: '#dcfce7', fontSize: 12, marginTop: 2 },
+  updatedTxt: { color: '#86efac', fontSize: 10, marginTop: 6, textAlign: 'right' },
+  alertCard: { borderRadius: 14, padding: 14, borderWidth: 1 },
+  alertHeat: { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
+  alertWarm: { backgroundColor: '#fef3c7', borderColor: '#fcd34d' },
+  alertFrost: { backgroundColor: '#e0f2fe', borderColor: '#7dd3fc' },
+  alertRain: { backgroundColor: '#eff6ff', borderColor: '#93c5fd' },
+  alertTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a' },
+  alertBody: { fontSize: 12, color: '#334155', marginTop: 4, lineHeight: 17 },
   actionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
   actionBtn: { flex: 1, backgroundColor: '#ffffff', borderRadius: 14, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#dcfce7', gap: 4 },
   actionLabel: { fontSize: 11, fontWeight: '700', color: '#1e293b' },
