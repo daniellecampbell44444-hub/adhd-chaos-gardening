@@ -1,15 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
 import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: '#15803d',
         tabBarInactiveTintColor: '#64748b',
-        headerStyle: { backgroundColor: '#f0fdf4' },
-        headerTintColor: '#14532d',
-        headerTitleStyle: { fontWeight: '800' },
+        tabBarStyle: {
+          backgroundColor: '#ffffff',
+          borderTopColor: '#dcfce7',
+        },
       }}
     >
       <Tabs.Screen
@@ -17,7 +20,7 @@ export default function TabsLayout() {
         options={{
           title: 'Pulse',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="leaf" size={size} color={typeof color === 'string' ? color : undefined} />
+            <Ionicons name="pulse" size={size} color={typeof color === 'string' ? color : undefined} />
           ),
         }}
       />
@@ -26,7 +29,7 @@ export default function TabsLayout() {
         options={{
           title: 'Plants',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flower" size={size} color={typeof color === 'string' ? color : undefined} />
+            <Ionicons name="leaf" size={size} color={typeof color === 'string' ? color : undefined} />
           ),
         }}
       />
@@ -44,7 +47,16 @@ export default function TabsLayout() {
         options={{
           title: 'Seeds',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet" size={size} color={typeof color === 'string' ? color : undefined} />
+            <Ionicons name="nutrition" size={size} color={typeof color === 'string' ? color : undefined} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="swap"
+        options={{
+          title: 'Swap',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="swap-horizontal" size={size} color={typeof color === 'string' ? color : undefined} />
           ),
         }}
       />
@@ -59,12 +71,4 @@ export default function TabsLayout() {
       />
     </Tabs>
   );
-}<Tabs.Screen
-  name="swap"
-  options={{
-    title: 'Swap',
-    tabBarIcon: ({ color, size }) => (
-      <Ionicons name="swap-horizontal" size={size} color={typeof color === 'string' ? color : undefined} />
-    ),
-  }}
-/>
+}
