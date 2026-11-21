@@ -103,6 +103,36 @@ export function normalizeSwapFulfillment(
     : "Pickup / Swap";
 }
 
+
+/* SWAP_SEED_POSTAGE_FEE_RULE */
+export function shouldShowSeedPostageFee(
+  categoryOrType?: string | null,
+  fulfillment?: string | null
+): boolean {
+  const normCat = String(categoryOrType || "").trim().toLowerCase();
+  const isSeed = normCat === "seed" || normCat === "seeds";
+  const isPostage = fulfillment === "Postage (Seeds Only)" || fulfillment === "Postage";
+  return isSeed && isPostage;
+}
+
+export function normalizeSeedPostageFeeAud(
+  categoryOrType: string | null | undefined,
+  fulfillment: string | null | undefined,
+  rawFee?: string | number | null
+): number | null {
+  if (!shouldShowSeedPostageFee(categoryOrType, fulfillment)) {
+    return null;
+  }
+  if (rawFee === null || rawFee === undefined || String(rawFee).trim() === "") {
+    return null;
+  }
+  const parsed = Number(String(rawFee).replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+  return Math.round(parsed * 100) / 100;
+}
+
 export default function SwapScreen() {
   const { user } = useGarden();
 
