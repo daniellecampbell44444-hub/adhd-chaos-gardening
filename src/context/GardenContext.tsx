@@ -1,6 +1,6 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export type Category = 'Vegetable' | 'Chilli' | 'Fruit' | 'Herb' | 'Leafy';
@@ -44,6 +44,15 @@ export const PLANT_LIBRARY: LibraryPlant[] = [
   { id: 'pea', name: 'Snow Peas', scientific: 'Pisum sativum', category: 'Vegetable', potMm: 300, potL: 15, tempMin: 10, tempMax: 22, heatTip: 'Sow March–July.', frostTip: 'Tolerates light frosts.', friends: ['Carrot', 'Spinach', 'Radish'], enemies: ['Onion', 'Garlic'], audPerKg: 14.0 },
   { id: 'lmg', name: 'Lemongrass', scientific: 'Cymbopogon citratus', category: 'Herb', potMm: 400, potL: 35, tempMin: 18, tempMax: 34, heatTip: 'Loves full sun & summer water.', frostTip: 'Cut back brown tips in spring.', friends: ['Chilli', 'Tomato'], enemies: ['None'], audPerKg: 18.0 },
   { id: 'bas', name: 'Sweet Basil', scientific: 'Ocimum basilicum', category: 'Herb', potMm: 200, potL: 6, tempMin: 18, tempMax: 30, heatTip: 'Afternoon shade on 40°C days.', frostTip: 'Blackens <5°C; shelter near brick wall.', friends: ['Tomato', 'Chilli', 'Capsicum'], enemies: ['Rue'], audPerKg: 35.0 },
+  { id: 'jal', name: 'Jalapeño Chilli', scientific: 'Capsicum annuum', category: 'Chilli', potMm: 350, potL: 20, tempMin: 20, tempMax: 32, heatTip: 'Afternoon shade in >36°C heat stops blossom drop.', frostTip: 'Shelter or overwinter before winter frosts.', friends: ['Basil', 'Tomato', 'Oregano'], enemies: ['Fennel', 'Beans'], audPerKg: 26.0 },
+  { id: 'hab', name: 'Habanero Chilli', scientific: 'Capsicum chinense', category: 'Chilli', potMm: 380, potL: 25, tempMin: 22, tempMax: 34, heatTip: 'Give dappled afternoon shade above 38°C.', frostTip: 'Very frost-sensitive; shelter on cold nights.', friends: ['Basil', 'Marigold', 'Chives'], enemies: ['Fennel'], audPerKg: 32.0 },
+  { id: 'cay', name: 'Cayenne Chilli', scientific: 'Capsicum annuum', category: 'Chilli', potMm: 320, potL: 18, tempMin: 20, tempMax: 32, heatTip: 'Keep soil evenly moist during fruiting; mulch deeply.', frostTip: 'Protect young plants below 5°C.', friends: ['Basil', 'Carrot', 'Tomato'], enemies: ['Fennel'], audPerKg: 28.0 },
+  { id: 'bro', name: 'Broccoli', scientific: 'Brassica oleracea var. italica', category: 'Vegetable', potMm: 350, potL: 22, tempMin: 12, tempMax: 24, heatTip: 'Heat makes heads bolt; best in cooler months.', frostTip: 'Handles light frosts once established.', friends: ['Dill', 'Chamomile', 'Onion'], enemies: ['Strawberry', 'Tomato'], audPerKg: 7.5 },
+  { id: 'oni', name: 'Spring Onion', scientific: 'Allium fistulosum', category: 'Vegetable', potMm: 220, potL: 8, tempMin: 12, tempMax: 26, heatTip: 'Keep consistently damp in warm weather.', frostTip: 'Hardy; grows slowly through cold snaps.', friends: ['Carrot', 'Tomato', 'Lettuce'], enemies: ['Peas', 'Beans'], audPerKg: 10.0 },
+  { id: 'egg', name: 'Eggplant', scientific: 'Solanum melongena', category: 'Vegetable', potMm: 400, potL: 30, tempMin: 20, tempMax: 32, heatTip: 'Thrives in summer heat; water at the base.', frostTip: 'Frost-tender; wait until warm weather settles.', friends: ['Beans', 'Thyme', 'Spinach'], enemies: ['Fennel'], audPerKg: 8.5 },
+  { id: 'thy', name: 'Thyme', scientific: 'Thymus vulgaris', category: 'Herb', potMm: 220, potL: 6, tempMin: 12, tempMax: 30, heatTip: 'Use free-draining soil; avoid waterlogging.', frostTip: 'Hardy in mild frosts once established.', friends: ['Cabbage', 'Strawberry', 'Tomato'], enemies: ['None'], audPerKg: 38.0 },
+  { id: 'ros', name: 'Rosemary', scientific: 'Salvia rosmarinus', category: 'Herb', potMm: 300, potL: 15, tempMin: 12, tempMax: 32, heatTip: 'Let top soil dry slightly between waterings.', frostTip: 'Hardy in light frosts.', friends: ['Bean', 'Carrot', 'Sage'], enemies: ['None'], audPerKg: 30.0 },
+  { id: 'min', name: 'Mint', scientific: 'Mentha', category: 'Herb', potMm: 300, potL: 15, tempMin: 12, tempMax: 28, heatTip: 'Give afternoon shade in extreme heat.', frostTip: 'Dies back lightly in cold and rebounds in spring.', friends: ['Tomato', 'Cabbage'], enemies: ['Parsley'], audPerKg: 34.0 },
 ];
 
 export const AUSSIE_FERT_PRESETS: Omit<Fertilizer, 'id'>[] = [
@@ -67,6 +76,69 @@ export function getSmartFeed(plant: Plant, ferts: Fertilizer[]) {
   const boost = needsBoost ? ferts.find(f => f.feedType === 'Potash Boost' && (f.targets.includes(plant.category) || f.targets.includes('All'))) || null : null;
   const dose = primary ? (isPot ? primary.potDosage : primary.bedDosage) : '';
   return { primary, boost, note: `${isPot ? 'Pot' : 'Bed'} dose: ${dose}${boost ? ` + ${boost.name} for ${plant.stage.toLowerCase()}` : ''}` };
+}
+
+export function checkPlantPlacementWarnings(
+  candidate: { name: string; site: string; potSize: string },
+  existingPlants: Plant[],
+  library: LibraryPlant[] = PLANT_LIBRARY
+) {
+  const warnings: string[] = [];
+  const highlights: string[] = [];
+
+  const libMatch = library.find(
+    item =>
+      item.name.toLowerCase() === candidate.name.toLowerCase() ||
+      candidate.name.toLowerCase().includes(item.name.toLowerCase())
+  );
+
+  const sameSitePlants = existingPlants.filter(
+    p => p.site.trim().toLowerCase() === candidate.site.trim().toLowerCase()
+  );
+
+  if (libMatch) {
+    for (const other of sameSitePlants) {
+      const otherName = other.name.toLowerCase();
+      const isEnemy = libMatch.enemies.some(
+        e => e !== 'None' && (otherName.includes(e.toLowerCase()) || e.toLowerCase().includes(otherName))
+      );
+      const isFriend = libMatch.friends.some(
+        f => otherName.includes(f.toLowerCase()) || f.toLowerCase().includes(otherName)
+      );
+
+      if (isEnemy) {
+        warnings.push(
+          `${candidate.name} and ${other.variety} ${other.name} in "${candidate.site}" aren't ideal neighbours.`
+        );
+      }
+      if (isFriend) {
+        highlights.push(
+          `Great buddy nearby: ${other.variety} ${other.name} in "${candidate.site}".`
+        );
+      }
+    }
+
+    const isContainer =
+      candidate.site.toLowerCase().includes('pot') || candidate.site.toLowerCase().includes('bag');
+    if (isContainer) {
+      const litreMatch = candidate.potSize.match(/(\d+(?:\.\d+)?)\s*L/i);
+      const mmMatch = candidate.potSize.match(/(\d+)\s*mm/i);
+      const chosenL = litreMatch ? Number(litreMatch[1]) : null;
+      const chosenMm = mmMatch ? Number(mmMatch[1]) : null;
+
+      if (chosenL !== null && chosenL < libMatch.potL) {
+        warnings.push(
+          `${candidate.name} likes ~${libMatch.potL}L (${libMatch.potMm}mm) — this container is ${chosenL}L, so it may dry out faster.`
+        );
+      } else if (chosenMm !== null && chosenMm < libMatch.potMm) {
+        warnings.push(
+          `${candidate.name} prefers at least ${libMatch.potMm}mm (${libMatch.potL}L) width — ${chosenMm}mm is snug.`
+        );
+      }
+    }
+  }
+
+  return { warnings, highlights };
 }
 
 interface GardenContextType {
