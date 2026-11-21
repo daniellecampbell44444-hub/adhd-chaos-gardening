@@ -16,6 +16,7 @@ import {
   getWateringDueInfo,
   AUSSIE_FERT_PRESETS,
   SoilCareType,
+  ScratchpadTag,
   WeatherMode,
 } from '../../context/GardenContext';
 import { TROUBLE_GUIDE, TroubleCategory } from '../../data/troubleGuide';
@@ -38,6 +39,7 @@ const SOIL_CARE_TYPES: SoilCareType[] = [
 ];
 
 const SOIL_SITES = ['Raised Beds', 'Pots', 'Standing Bed', 'Front Yard', 'Backyard'];
+const SCRATCHPAD_TAGS: ScratchpadTag[] = ['Pest / Leaf', 'Water / Sun', 'Harvest / Kitchen', 'Idea / To-Do'];
 const WEATHER_MODES: WeatherMode[] = ['Normal', 'Hot / Dry Spell', 'Rain Day'];
 
 export default function CareScreen() {
@@ -46,6 +48,7 @@ export default function CareScreen() {
     fertilizers,
     soilLogs,
     reminders,
+    scratchpadNotes,
     weatherMode,
     setWeatherMode,
     waterPlant,
@@ -61,6 +64,9 @@ export default function CareScreen() {
     toggleReminder,
     addReminder,
     catchUpReminders,
+    addScratchpadNote,
+    toggleScratchpadPin,
+    deleteScratchpadNote,
   } = useGarden();
 
   const [dueOnlyFilter, setDueOnlyFilter] = useState(false);
@@ -74,6 +80,9 @@ export default function CareScreen() {
   const [amountLabel, setAmountLabel] = useState('5cm layer');
   const [phEstimate, setPhEstimate] = useState('6.5');
   const [soilNotes, setSoilNotes] = useState('');
+  const [scratchpadText, setScratchpadText] = useState('');
+  const [scratchpadTag, setScratchpadTag] = useState<ScratchpadTag>('Pest / Leaf');
+  const [scratchpadSite, setScratchpadSite] = useState<string>('Pots');
 
   const duePlants = plants.filter(p => getWateringDueInfo(p, weatherMode).isDue);
   const dueCount = duePlants.length;
@@ -98,6 +107,16 @@ export default function CareScreen() {
   const handleCreateTroubleReminder = (title: string) => {
     addReminder(title, 'Today — Check Garden');
     Alert.alert('Reminder added', 'Added to your reminders list.');
+  };
+
+  const sortedScratchpadNotes = [...scratchpadNotes].sort(
+    (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))
+  );
+
+  const handleQuickScratchpadAdd = () => {
+    if (!scratchpadText.trim()) return;
+    addScratchpadNote(scratchpadText, scratchpadTag, scratchpadSite);
+    setScratchpadText('');
   };
 
   const handleSaveSoilLog = () => {
@@ -415,6 +434,101 @@ export default function CareScreen() {
               <TouchableOpacity onPress={() => deleteFertilizer(f.id)}>
                 <Text style={styles.del}>✕</Text>
               </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Quick Garden Observation Scratchpad */}
+      <View style={styles.card}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Quick Yard Scratchpad ({scratchpadNotes.length})</Text>
+          <Text style={styles.badgeText}>Fast Notes</Text>
+        </View>
+        <Text style={styles.sub}>
+          Jot down quick observations while walking the pots or raised beds—pin key notes or turn one into a reminder.
+        </Text>
+
+        <View style={styles.wrapRow}>
+          {SCRATCHPAD_TAGS.map(tag => {
+            const active = scratchpadTag === tag;
+            return (
+              <TouchableOpacity
+                key={tag}
+                style={[styles.choicePill, active && styles.choicePillActive]}
+                onPress={() => setScratchpadTag(tag)}
+              >
+                <Text style={[styles.choicePillText, active && styles.choicePillTextActive]}>
+                  {tag}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.wrapRow}>
+          {SOIL_SITES.map(spot => {
+            const active = scratchpadSite === spot;
+            return (
+              <TouchableOpacity
+                key={spot}
+                style={[styles.miniSpotChip, active && styles.miniSpotChipActive]}
+                onPress={() => setScratchpadSite(active ? '' : spot)}
+              >
+                <Text style={[styles.miniSpotText, active && styles.miniSpotTextActive]}>
+                  {spot}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.scratchInputRow}>
+          <TextInput
+            value={scratchpadText}
+            onChangeText={setScratchpadText}
+            placeholder="e.g. Curled tip on Jalapeño pot, check for mites..."
+            style={[styles.input, { flex: 1 }]}
+            onSubmitEditing={handleQuickScratchpadAdd}
+            returnKeyType="done"
+          />
+          <TouchableOpacity style={styles.saveBtn} onPress={handleQuickScratchpadAdd}>
+            <Text style={styles.saveText}>Jot</Text>
+          </TouchableOpacity>
+        </View>
+
+        {sortedScratchpadNotes.length === 0 ? (
+          <Text style={styles.sub}>No yard notes yet. Type a quick observation above and tap Jot.</Text>
+        ) : (
+          sortedScratchpadNotes.map(note => (
+            <View key={note.id} style={styles.scratchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemTitle}>
+                  {note.pinned ? '📌 ' : ''}
+                  {note.text}
+                </Text>
+                <Text style={styles.sub}>
+                  {note.tag}
+                  {note.site ? ` • ${note.site}` : ''} • {note.date}
+                </Text>
+              </View>
+              <View style={styles.rowGap}>
+                <TouchableOpacity
+                  style={styles.miniActionPill}
+                  onPress={() => toggleScratchpadPin(note.id)}
+                >
+                  <Text style={styles.miniActionText}>{note.pinned ? 'Unpin' : 'Pin'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.miniActionPill}
+                  onPress={() => handleCreateTroubleReminder(note.text)}
+                >
+                  <Text style={styles.miniActionText}>+ Remind</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteScratchpadNote(note.id)}>
+                  <Text style={styles.del}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))
         )}
@@ -751,6 +865,38 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f1f5f9',
   },
   del: { fontSize: 14, color: '#94a3b8', fontWeight: '700', paddingHorizontal: 4 },
+  miniSpotChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: '#f1f5f9',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  miniSpotChipActive: {
+    backgroundColor: '#dcfce7',
+    borderColor: '#16a34a',
+  },
+  miniSpotText: { fontSize: 11, fontWeight: '700', color: '#475569' },
+  miniSpotTextActive: { color: '#14532d' },
+  scratchInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scratchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  miniActionPill: {
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  miniActionText: { fontSize: 11, fontWeight: '800', color: '#15803d' },
   remRow: {
     paddingVertical: 6,
     borderBottomWidth: 1,

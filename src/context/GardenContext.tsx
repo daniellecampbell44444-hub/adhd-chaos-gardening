@@ -11,6 +11,7 @@ export type PropagationMethod = 'Cutting' | 'Division' | 'Runner / Slip';
 export type PropagationMedium = 'Water' | 'Seed Raising Mix' | 'Perlite / Coco' | 'Direct Soil';
 export type PropagationStatus = 'Callusing / Rooting' | 'Roots Forming' | 'Ready to Pot Up';
 export type SoilCareType = 'Soil Mix' | 'Mulch Top-Up' | 'Compost / Worm Castings' | 'pH / Soil Amendment';
+export type ScratchpadTag = 'Pest / Leaf' | 'Water / Sun' | 'Harvest / Kitchen' | 'Idea / To-Do';
 
 export interface LibraryPlant {
   id: string; name: string; scientific: string; category: Category;
@@ -55,6 +56,14 @@ export interface SoilLogItem {
 export interface HarvestLog { id: string; crop: string; grams: number; valueAud: number; date: string; }
 export interface ExpenseLog { id: string; item: string; category: string; costAud: number; date: string; }
 export interface Reminder { id: string; title: string; due: string; done: boolean; }
+export interface ScratchpadNote {
+  id: string;
+  text: string;
+  tag: ScratchpadTag;
+  site?: string;
+  date: string;
+  pinned?: boolean;
+}
 
 export const PLANT_LIBRARY: LibraryPlant[] = [
   { id: 'tom', name: 'Tomato', scientific: 'Solanum lycopersicum', category: 'Vegetable', potMm: 400, potL: 35, tempMin: 18, tempMax: 29, heatTip: '30% shade cloth >35°C; mulch deeply & water base at dawn.', frostTip: 'Frost-tender; protect below 5°C.', friends: ['Basil', 'Marigold', 'Carrot'], enemies: ['Potato', 'Fennel'], audPerKg: 7.5 },
@@ -237,6 +246,7 @@ interface GardenContextType {
   harvests: HarvestLog[];
   expenses: ExpenseLog[];
   reminders: Reminder[];
+  scratchpadNotes: ScratchpadNote[];
   weatherMode: WeatherMode;
   setWeatherMode: (mode: WeatherMode) => void;
   user: User | null;
@@ -271,6 +281,9 @@ interface GardenContextType {
   addReminder: (title: string, due: string) => void;
   toggleReminder: (id: string) => void;
   catchUpReminders: () => void;
+  addScratchpadNote: (text: string, tag: ScratchpadTag, site?: string) => void;
+  toggleScratchpadPin: (id: string) => void;
+  deleteScratchpadNote: (id: string) => void;
   loadSampleGarden: () => void;
 }
 
@@ -286,6 +299,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [harvests, setHarvests] = useState<HarvestLog[]>([]);
   const [expenses, setExpenses] = useState<ExpenseLog[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [scratchpadNotes, setScratchpadNotes] = useState<ScratchpadNote[]>([]);
   const [weatherMode, setWeatherMode] = useState<WeatherMode>('Normal');
   const [loaded, setLoaded] = useState(false);
 
@@ -306,6 +320,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           setHarvests(d.harvests || []);
           setExpenses(d.expenses || []);
           setReminders(d.reminders || []);
+          setScratchpadNotes(d.scratchpadNotes || []);
           if (d.weatherMode) setWeatherMode(d.weatherMode);
         } catch {}
       }
@@ -350,7 +365,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           (cloud.seeds?.length || 0) > 0 ||
           (cloud.propagations?.length || 0) > 0 ||
           (cloud.soilLogs?.length || 0) > 0 ||
-          (cloud.harvests?.length || 0) > 0);
+          (cloud.harvests?.length || 0) > 0 ||
+          (cloud.scratchpadNotes?.length || 0) > 0);
       if (hasCloudData) {
         skipNextPush.current = true;
         setPlants(cloud.plants || []);
@@ -361,10 +377,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         setHarvests(cloud.harvests || []);
         setExpenses(cloud.expenses || []);
         setReminders(cloud.reminders || []);
+        setScratchpadNotes(cloud.scratchpadNotes || []);
         if (cloud.weatherMode) setWeatherMode(cloud.weatherMode);
         setSyncStatus('synced');
       } else {
-        const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, weatherMode };
+        const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode };
         const { error: upErr } = await supabase
           .from('gardens')
           .upsert({ user_id: user.id, data: payload, updated_at: new Date().toISOString() });
@@ -376,7 +393,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return;
-    const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, weatherMode };
+    const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
     if (!user) return;
@@ -394,7 +411,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, weatherMode, loaded, user]);
+  }, [plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode, loaded, user]);
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email: email.trim(), password });
@@ -538,6 +555,27 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     setReminders(prev => prev.map(r => (r.id === id ? { ...r, done: !r.done } : r)));
   const catchUpReminders = () =>
     setReminders(prev => prev.map(r => (r.done ? r : { ...r, due: 'Rescheduled — Today' })));
+  const addScratchpadNote = (text: string, tag: ScratchpadTag, site?: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    setScratchpadNotes(prev => [
+      {
+        id: uid(),
+        text: clean,
+        tag,
+        site: site?.trim() || undefined,
+        date: today(),
+        pinned: false,
+      },
+      ...prev,
+    ]);
+  };
+  const toggleScratchpadPin = (id: string) =>
+    setScratchpadNotes(prev =>
+      prev.map(n => (n.id === id ? { ...n, pinned: !n.pinned } : n))
+    );
+  const deleteScratchpadNote = (id: string) =>
+    setScratchpadNotes(prev => prev.filter(n => n.id !== id));
 
   const loadSampleGarden = () => {
     setPlants([
@@ -591,6 +629,16 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       { id: uid(), title: 'Deep soak pots before 38°C afternoon', due: 'Today 7:00 AM', done: false },
       { id: uid(), title: 'Feed fruiting tomatoes with Potash', due: 'Sunday', done: false },
     ]);
+    setScratchpadNotes([
+      {
+        id: uid(),
+        text: 'Check undersides of chilli & tomato leaves for mites or curling tips',
+        tag: 'Pest / Leaf',
+        site: 'Pots',
+        date: today(),
+        pinned: true,
+      },
+    ]);
   };
 
   return (
@@ -604,6 +652,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         harvests,
         expenses,
         reminders,
+        scratchpadNotes,
         weatherMode,
         setWeatherMode,
         user,
@@ -638,6 +687,9 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         addReminder,
         toggleReminder,
         catchUpReminders,
+        addScratchpadNote,
+        toggleScratchpadPin,
+        deleteScratchpadNote,
         loadSampleGarden,
       }}
     >
