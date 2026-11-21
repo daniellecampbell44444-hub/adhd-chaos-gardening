@@ -1,11 +1,14 @@
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export type Category = 'Vegetable' | 'Chilli' | 'Fruit' | 'Herb' | 'Leafy';
 export type Stage = 'Seedling' | 'Growing' | 'Flowering' | 'Fruiting' | 'Dormant';
 export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
+export type PropagationMethod = 'Cutting' | 'Division' | 'Runner / Slip';
+export type PropagationMedium = 'Water' | 'Seed Raising Mix' | 'Perlite / Coco' | 'Direct Soil';
+export type PropagationStatus = 'Callusing / Rooting' | 'Roots Forming' | 'Ready to Pot Up';
 
 export interface LibraryPlant {
   id: string; name: string; scientific: string; category: Category;
@@ -23,6 +26,19 @@ export interface Fertilizer {
 }
 export interface SeedItem {
   id: string; name: string; variety: string; packets: number; approxSeeds: number; season: string; wishlist: boolean;
+}
+export interface PropagationItem {
+  id: string;
+  name: string;
+  variety: string;
+  category: Category;
+  method: PropagationMethod;
+  medium: PropagationMedium;
+  quantity: number;
+  startedDate: string;
+  targetSite: string;
+  status: PropagationStatus;
+  notes?: string;
 }
 export interface HarvestLog { id: string; crop: string; grams: number; valueAud: number; date: string; }
 export interface ExpenseLog { id: string; item: string; category: string; costAud: number; date: string; }
@@ -53,146 +69,7 @@ export const PLANT_LIBRARY: LibraryPlant[] = [
   { id: 'thy', name: 'Thyme', scientific: 'Thymus vulgaris', category: 'Herb', potMm: 220, potL: 6, tempMin: 12, tempMax: 30, heatTip: 'Use free-draining soil; avoid waterlogging.', frostTip: 'Hardy in mild frosts once established.', friends: ['Cabbage', 'Strawberry', 'Tomato'], enemies: ['None'], audPerKg: 38.0 },
   { id: 'ros', name: 'Rosemary', scientific: 'Salvia rosmarinus', category: 'Herb', potMm: 300, potL: 15, tempMin: 12, tempMax: 32, heatTip: 'Let top soil dry slightly between waterings.', frostTip: 'Hardy in light frosts.', friends: ['Bean', 'Carrot', 'Sage'], enemies: ['None'], audPerKg: 30.0 },
   { id: 'min', name: 'Mint', scientific: 'Mentha', category: 'Herb', potMm: 300, potL: 15, tempMin: 12, tempMax: 28, heatTip: 'Give afternoon shade in extreme heat.', frostTip: 'Dies back lightly in cold and rebounds in spring.', friends: ['Tomato', 'Cabbage'], enemies: ['Parsley'], audPerKg: 34.0 },
-// Extra Chillies (note: 'Chilli' category feeds into getSmartFeed & companion checks)
-  {
-    id: 'jal',
-    name: 'Jalapeño Chilli',
-    scientific: 'Capsicum annuum',
-    category: 'Chilli',
-    potMm: 350,
-    potL: 20,
-    tempMin: 20,
-    tempMax: 32,
-    heatTip: 'Afternoon shade in >36°C heat stops blossom drop and sunscald.',
-    frostTip: 'Shelter or overwinter in a protected spot before winter frosts.',
-    friends: ['Basil', 'Tomato', 'Oregano'],
-    enemies: ['Fennel', 'Beans'],
-    audPerKg: 26.0,
-  },
-  {
-    id: 'hab',
-    name: 'Habanero Chilli',
-    scientific: 'Capsicum chinense',
-    category: 'Chilli',
-    potMm: 380,
-    potL: 25,
-    tempMin: 22,
-    tempMax: 34,
-    heatTip: 'Loves warmth, but give dappled afternoon shade above 38°C.',
-    frostTip: 'Very frost-sensitive; bring pots under cover on cold nights.',
-    friends: ['Basil', 'Marigold', 'Chives'],
-    enemies: ['Fennel'],
-    audPerKg: 32.0,
-  },
-  {
-    id: 'cay',
-    name: 'Cayenne Chilli',
-    scientific: 'Capsicum annuum',
-    category: 'Chilli',
-    potMm: 320,
-    potL: 18,
-    tempMin: 20,
-    tempMax: 32,
-    heatTip: 'Keep soil evenly moist during fruiting; mulch pots deeply.',
-    frostTip: 'Protect young or unhardened plants below 5°C.',
-    friends: ['Basil', 'Carrot', 'Tomato'],
-    enemies: ['Fennel'],
-    audPerKg: 28.0,
-  },
-
-  // Extra Vegetables
-  {
-    id: 'bro',
-    name: 'Broccoli',
-    scientific: 'Brassica oleracea var. italica',
-    category: 'Vegetable',
-    potMm: 350,
-    potL: 22,
-    tempMin: 12,
-    tempMax: 24,
-    heatTip: 'Heat makes heads bolt or turn loose; best in cooler months.',
-    frostTip: 'Handles light frosts once established.',
-    friends: ['Dill', 'Chamomile', 'Onion'],
-    enemies: ['Strawberry', 'Tomato', 'Pole Beans'],
-    audPerKg: 7.5,
-  },
-  {
-    id: 'oni',
-    name: 'Spring Onion',
-    scientific: 'Allium fistulosum',
-    category: 'Vegetable',
-    potMm: 220,
-    potL: 8,
-    tempMin: 12,
-    tempMax: 26,
-    heatTip: 'Keep consistently damp in warm weather so stalks stay tender.',
-    frostTip: 'Fairly hardy; grows slowly through cold snaps.',
-    friends: ['Carrot', 'Tomato', 'Lettuce'],
-    enemies: ['Peas', 'Beans'],
-    audPerKg: 10.0,
-  },
-  {
-    id: 'egg',
-    name: 'Eggplant',
-    scientific: 'Solanum melongena',
-    category: 'Vegetable',
-    potMm: 400,
-    potL: 30,
-    tempMin: 20,
-    tempMax: 32,
-    heatTip: 'Thrives in summer heat; water at the base to protect foliage.',
-    frostTip: 'Frost-tender; wait until warm weather settles.',
-    friends: ['Beans', 'Thyme', 'Spinach'],
-    enemies: ['Fennel'],
-    audPerKg: 8.5,
-  },
-
-  // Extra Herbs
-  {
-    id: 'thy',
-    name: 'Thyme',
-    scientific: 'Thymus vulgaris',
-    category: 'Herb',
-    potMm: 220,
-    potL: 6,
-    tempMin: 12,
-    tempMax: 30,
-    heatTip: 'Uses free-draining soil; avoid waterlogging in summer storms.',
-    frostTip: 'Hardy in mild frosts once established.',
-    friends: ['Cabbage', 'Strawberry', 'Tomato'],
-    enemies: ['None'],
-    audPerKg: 38.0,
-  },
-  {
-    id: 'ros',
-    name: 'Rosemary',
-    scientific: 'Salvia rosmarinus',
-    category: 'Herb',
-    potMm: 300,
-    potL: 15,
-    tempMin: 12,
-    tempMax: 32,
-    heatTip: 'Tolerates heat well; let top soil dry slightly between waterings.',
-    frostTip: 'Hardy in light frosts.',
-    friends: ['Bean', 'Carrot', 'Sage'],
-    enemies: ['None'],
-    audPerKg: 30.0,
-  },
-  {
-    id: 'min',
-    name: 'Mint',
-    scientific: 'Mentha',
-    category: 'Herb',
-    potMm: 300,
-    potL: 15,
-    tempMin: 12,
-    tempMax: 28,
-    heatTip: 'Give afternoon shade in extreme heat and keep soil moist.',
-    frostTip: 'Dies back lightly in cold weather and rebounds in spring.',
-    friends: ['Tomato', 'Cabbage'],
-    enemies: ['Parsley'],
-    audPerKg: 34.0,
-  },];
+];
 
 export const AUSSIE_FERT_PRESETS: Omit<Fertilizer, 'id'>[] = [
   { brand: 'Seasol', name: 'Seaweed Health Tonic', feedType: 'Organic', targets: ['All', 'Seedling'], potDosage: '30mL / 9L can', bedDosage: '40mL / 9L can', freqDays: 14 },
@@ -281,20 +158,41 @@ export function checkPlantPlacementWarnings(
 }
 
 interface GardenContextType {
-  plants: Plant[]; fertilizers: Fertilizer[]; seeds: SeedItem[]; harvests: HarvestLog[]; expenses: ExpenseLog[]; reminders: Reminder[];
-  user: User | null; syncStatus: SyncStatus;
+  plants: Plant[];
+  fertilizers: Fertilizer[];
+  seeds: SeedItem[];
+  propagations: PropagationItem[];
+  harvests: HarvestLog[];
+  expenses: ExpenseLog[];
+  reminders: Reminder[];
+  user: User | null;
+  syncStatus: SyncStatus;
   signUp: (email: string, password: string) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
-  addPlant: (p: Omit<Plant, 'id'>) => void; updatePlantQty: (id: string, delta: number) => void;
-  cyclePlantStage: (id: string) => void; deletePlant: (id: string) => void;
-  waterPlant: (id: string) => void; feedPlant: (id: string) => void; waterAll: () => void; feedAll: () => void;
-  addFertilizer: (f: Omit<Fertilizer, 'id'>) => void; deleteFertilizer: (id: string) => void;
-  addSeed: (s: Omit<SeedItem, 'id'>) => void; updateSeedCount: (id: string, field: 'packets' | 'approxSeeds', delta: number) => void;
-  sowSeed: (id: string) => void; deleteSeed: (id: string) => void;
+  addPlant: (p: Omit<Plant, 'id'>) => void;
+  updatePlantQty: (id: string, delta: number) => void;
+  cyclePlantStage: (id: string) => void;
+  deletePlant: (id: string) => void;
+  waterPlant: (id: string) => void;
+  feedPlant: (id: string) => void;
+  waterAll: () => void;
+  feedAll: () => void;
+  addFertilizer: (f: Omit<Fertilizer, 'id'>) => void;
+  deleteFertilizer: (id: string) => void;
+  addSeed: (s: Omit<SeedItem, 'id'>) => void;
+  updateSeedCount: (id: string, field: 'packets' | 'approxSeeds', delta: number) => void;
+  sowSeed: (id: string) => void;
+  deleteSeed: (id: string) => void;
+  addPropagation: (item: Omit<PropagationItem, 'id' | 'startedDate' | 'status'>) => void;
+  cyclePropagationStatus: (id: string) => void;
+  promotePropagationToPlant: (id: string) => void;
+  deletePropagation: (id: string) => void;
   addHarvest: (crop: string, grams: number, valueAud?: number) => void;
   addExpense: (item: string, category: string, costAud: number) => void;
-  addReminder: (title: string, due: string) => void; toggleReminder: (id: string) => void; catchUpReminders: () => void;
+  addReminder: (title: string, due: string) => void;
+  toggleReminder: (id: string) => void;
+  catchUpReminders: () => void;
   loadSampleGarden: () => void;
 }
 
@@ -305,6 +203,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [fertilizers, setFertilizers] = useState<Fertilizer[]>([]);
   const [seeds, setSeeds] = useState<SeedItem[]>([]);
+  const [propagations, setPropagations] = useState<PropagationItem[]>([]);
   const [harvests, setHarvests] = useState<HarvestLog[]>([]);
   const [expenses, setExpenses] = useState<ExpenseLog[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
@@ -319,8 +218,13 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         try {
           const d = JSON.parse(raw);
-          setPlants(d.plants || []); setFertilizers(d.fertilizers || []); setSeeds(d.seeds || []);
-          setHarvests(d.harvests || []); setExpenses(d.expenses || []); setReminders(d.reminders || []);
+          setPlants(d.plants || []);
+          setFertilizers(d.fertilizers || []);
+          setSeeds(d.seeds || []);
+          setPropagations(d.propagations || []);
+          setHarvests(d.harvests || []);
+          setExpenses(d.expenses || []);
+          setReminders(d.reminders || []);
         } catch {}
       }
       setLoaded(true);
@@ -358,18 +262,24 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       }
 
       const cloud = data?.data as any;
-      const hasCloudData = cloud && ((cloud.plants?.length || 0) > 0 || (cloud.seeds?.length || 0) > 0 || (cloud.harvests?.length || 0) > 0);
+      const hasCloudData =
+        cloud &&
+        ((cloud.plants?.length || 0) > 0 ||
+          (cloud.seeds?.length || 0) > 0 ||
+          (cloud.propagations?.length || 0) > 0 ||
+          (cloud.harvests?.length || 0) > 0);
       if (hasCloudData) {
         skipNextPush.current = true;
         setPlants(cloud.plants || []);
         setFertilizers(cloud.fertilizers || []);
         setSeeds(cloud.seeds || []);
+        setPropagations(cloud.propagations || []);
         setHarvests(cloud.harvests || []);
         setExpenses(cloud.expenses || []);
         setReminders(cloud.reminders || []);
         setSyncStatus('synced');
       } else {
-        const payload = { plants, fertilizers, seeds, harvests, expenses, reminders };
+        const payload = { plants, fertilizers, seeds, propagations, harvests, expenses, reminders };
         const { error: upErr } = await supabase
           .from('gardens')
           .upsert({ user_id: user.id, data: payload, updated_at: new Date().toISOString() });
@@ -381,7 +291,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return;
-    const payload = { plants, fertilizers, seeds, harvests, expenses, reminders };
+    const payload = { plants, fertilizers, seeds, propagations, harvests, expenses, reminders };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
     if (!user) return;
@@ -399,7 +309,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [plants, fertilizers, seeds, harvests, expenses, reminders, loaded, user]);
+  }, [plants, fertilizers, seeds, propagations, harvests, expenses, reminders, loaded, user]);
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email: email.trim(), password });
@@ -419,36 +329,111 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const today = () => new Date().toISOString().slice(0, 10);
   const uid = () => Math.random().toString(36).slice(2, 9);
   const stages: Stage[] = ['Seedling', 'Growing', 'Flowering', 'Fruiting', 'Dormant'];
+  const propStatuses: PropagationStatus[] = [
+    'Callusing / Rooting',
+    'Roots Forming',
+    'Ready to Pot Up',
+  ];
 
   const addPlant = (p: Omit<Plant, 'id'>) => setPlants(prev => [{ ...p, id: uid() }, ...prev]);
-  const updatePlantQty = (id: string, delta: number) => setPlants(prev => prev.map(p => p.id === id ? { ...p, quantity: Math.max(1, p.quantity + delta) } : p));
-  const cyclePlantStage = (id: string) => setPlants(prev => prev.map(p => p.id === id ? { ...p, stage: stages[(stages.indexOf(p.stage) + 1) % stages.length] } : p));
+  const updatePlantQty = (id: string, delta: number) =>
+    setPlants(prev => prev.map(p => (p.id === id ? { ...p, quantity: Math.max(1, p.quantity + delta) } : p)));
+  const cyclePlantStage = (id: string) =>
+    setPlants(prev =>
+      prev.map(p => (p.id === id ? { ...p, stage: stages[(stages.indexOf(p.stage) + 1) % stages.length] } : p))
+    );
   const deletePlant = (id: string) => setPlants(prev => prev.filter(p => p.id !== id));
-  const waterPlant = (id: string) => setPlants(prev => prev.map(p => p.id === id ? { ...p, lastWatered: today() } : p));
-  const feedPlant = (id: string) => setPlants(prev => prev.map(p => p.id === id ? { ...p, lastFed: today() } : p));
+  const waterPlant = (id: string) => setPlants(prev => prev.map(p => (p.id === id ? { ...p, lastWatered: today() } : p)));
+  const feedPlant = (id: string) => setPlants(prev => prev.map(p => (p.id === id ? { ...p, lastFed: today() } : p)));
   const waterAll = () => setPlants(prev => prev.map(p => ({ ...p, lastWatered: today() })));
-  const feedAll = () => setPlants(prev => prev.map(p => p.stage === 'Dormant' ? p : { ...p, lastFed: today() }));
-  const addFertilizer = (f: Omit<Fertilizer, 'id'>) => setFertilizers(prev => [{ ...f, id: uid() }, ...prev]);
+  const feedAll = () =>
+    setPlants(prev => prev.map(p => (p.stage === 'Dormant' ? p : { ...p, lastFed: today() })));
+
+  const addFertilizer = (f: Omit<Fertilizer, 'id'>) =>
+    setFertilizers(prev => [{ ...f, id: uid() }, ...prev]);
   const deleteFertilizer = (id: string) => setFertilizers(prev => prev.filter(f => f.id !== id));
+
   const addSeed = (s: Omit<SeedItem, 'id'>) => setSeeds(prev => [{ ...s, id: uid() }, ...prev]);
   const updateSeedCount = (id: string, field: 'packets' | 'approxSeeds', delta: number) =>
-    setSeeds(prev => prev.map(s => s.id === id ? { ...s, [field]: Math.max(0, s[field] + delta) } : s));
+    setSeeds(prev =>
+      prev.map(s => (s.id === id ? { ...s, [field]: Math.max(0, s[field] + delta) } : s))
+    );
   const sowSeed = (id: string) => {
     const s = seeds.find(x => x.id === id);
     if (!s) return;
     const m = PLANT_LIBRARY.find(l => s.name.toLowerCase().includes(l.name.toLowerCase()));
-    addPlant({ name: s.name, variety: s.variety || 'Standard', scientific: m?.scientific || '', category: m?.category || 'Vegetable', quantity: 1, site: 'Pots', stage: 'Seedling', potSize: m ? `${m.potMm}mm (${m.potL}L)` : '300mm (15L)', idealTemp: m ? `${m.tempMin}–${m.tempMax}°C` : '16–28°C', waterEveryDays: 2 });
+    addPlant({
+      name: s.name,
+      variety: s.variety || 'Standard',
+      scientific: m?.scientific || '',
+      category: m?.category || 'Vegetable',
+      quantity: 1,
+      site: 'Pots',
+      stage: 'Seedling',
+      potSize: m ? `${m.potMm}mm (${m.potL}L)` : '300mm (15L)',
+      idealTemp: m ? `${m.tempMin}–${m.tempMax}°C` : '16–28°C',
+      waterEveryDays: 2,
+    });
     updateSeedCount(id, 'approxSeeds', -5);
   };
   const deleteSeed = (id: string) => setSeeds(prev => prev.filter(s => s.id !== id));
+
+  const addPropagation = (item: Omit<PropagationItem, 'id' | 'startedDate' | 'status'>) =>
+    setPropagations(prev => [
+      {
+        ...item,
+        id: uid(),
+        startedDate: today(),
+        status: 'Callusing / Rooting',
+      },
+      ...prev,
+    ]);
+
+  const cyclePropagationStatus = (id: string) =>
+    setPropagations(prev =>
+      prev.map(item =>
+        item.id === id
+          ? {
+              ...item,
+              status: propStatuses[(propStatuses.indexOf(item.status) + 1) % propStatuses.length],
+            }
+          : item
+      )
+    );
+
+  const promotePropagationToPlant = (id: string) => {
+    const item = propagations.find(p => p.id === id);
+    if (!item) return;
+    const m = PLANT_LIBRARY.find(l => item.name.toLowerCase().includes(l.name.toLowerCase()));
+    addPlant({
+      name: item.name,
+      variety: item.variety || 'Propagated',
+      scientific: m?.scientific || '',
+      category: item.category,
+      quantity: Math.max(1, item.quantity),
+      site: item.targetSite || 'Pots',
+      stage: 'Seedling',
+      potSize: m ? `${m.potMm}mm (${m.potL}L)` : '300mm (15L)',
+      idealTemp: m ? `${m.tempMin}–${m.tempMax}°C` : '16–28°C',
+      waterEveryDays: 2,
+    });
+    setPropagations(prev => prev.filter(p => p.id !== id));
+  };
+
+  const deletePropagation = (id: string) =>
+    setPropagations(prev => prev.filter(p => p.id !== id));
+
   const addHarvest = (crop: string, grams: number, valueAud?: number) => {
     const m = PLANT_LIBRARY.find(l => crop.toLowerCase().includes(l.name.toLowerCase()));
     const est = valueAud ?? Number(((grams / 1000) * (m?.audPerKg || 8)).toFixed(2));
     setHarvests(prev => [{ id: uid(), crop, grams, valueAud: est, date: today() }, ...prev]);
   };
-  const addExpense = (item: string, category: string, costAud: number) => setExpenses(prev => [{ id: uid(), item, category, costAud, date: today() }, ...prev]);
-  const addReminder = (title: string, due: string) => setReminders(prev => [{ id: uid(), title, due, done: false }, ...prev]);
-  const toggleReminder = (id: string) => setReminders(prev => prev.map(r => r.id === id ? { ...r, done: !r.done } : r));
+  const addExpense = (item: string, category: string, costAud: number) =>
+    setExpenses(prev => [{ id: uid(), item, category, costAud, date: today() }, ...prev]);
+  const addReminder = (title: string, due: string) =>
+    setReminders(prev => [{ id: uid(), title, due, done: false }, ...prev]);
+  const toggleReminder = (id: string) =>
+    setReminders(prev => prev.map(r => (r.id === id ? { ...r, done: !r.done } : r)));
   const catchUpReminders = () =>
     setReminders(prev => prev.map(r => (r.done ? r : { ...r, due: 'Rescheduled — Today' })));
 
@@ -468,6 +453,34 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
       { id: uid(), name: 'Zucchini', variety: 'Gold Max', packets: 1, approxSeeds: 20, season: 'Spring/Summer', wishlist: false },
       { id: uid(), name: 'Blueberry', variety: 'Sunshine Blue', packets: 0, approxSeeds: 0, season: 'Winter/Spring', wishlist: true },
     ]);
+    setPropagations([
+      {
+        id: uid(),
+        name: 'Sweet Potato',
+        variety: 'Gold Slip',
+        category: 'Vegetable',
+        method: 'Runner / Slip',
+        medium: 'Water',
+        quantity: 6,
+        startedDate: today(),
+        targetSite: 'Raised Beds',
+        status: 'Roots Forming',
+        notes: 'Keep nodes submerged and refresh water every few days.',
+      },
+      {
+        id: uid(),
+        name: 'Mint',
+        variety: 'Spearmint',
+        category: 'Herb',
+        method: 'Division',
+        medium: 'Seed Raising Mix',
+        quantity: 3,
+        startedDate: today(),
+        targetSite: 'Pots',
+        status: 'Ready to Pot Up',
+        notes: 'Keep in its own pot so runners stay contained.',
+      },
+    ]);
     setHarvests([
       { id: uid(), crop: 'Tommy Toe Tomato', grams: 850, valueAud: 6.38, date: today() },
       { id: uid(), crop: 'Strawberry', grams: 400, valueAud: 6.40, date: today() },
@@ -480,13 +493,46 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <GardenContext.Provider value={{
-      plants, fertilizers, seeds, harvests, expenses, reminders,
-      user, syncStatus, signUp, signIn, signOut,
-      addPlant, updatePlantQty, cyclePlantStage, deletePlant, waterPlant, feedPlant, waterAll, feedAll,
-      addFertilizer, deleteFertilizer, addSeed, updateSeedCount, sowSeed, deleteSeed,
-      addHarvest, addExpense, addReminder, toggleReminder, catchUpReminders, loadSampleGarden,
-    }}>
+    <GardenContext.Provider
+      value={{
+        plants,
+        fertilizers,
+        seeds,
+        propagations,
+        harvests,
+        expenses,
+        reminders,
+        user,
+        syncStatus,
+        signUp,
+        signIn,
+        signOut,
+        addPlant,
+        updatePlantQty,
+        cyclePlantStage,
+        deletePlant,
+        waterPlant,
+        feedPlant,
+        waterAll,
+        feedAll,
+        addFertilizer,
+        deleteFertilizer,
+        addSeed,
+        updateSeedCount,
+        sowSeed,
+        deleteSeed,
+        addPropagation,
+        cyclePropagationStatus,
+        promotePropagationToPlant,
+        deletePropagation,
+        addHarvest,
+        addExpense,
+        addReminder,
+        toggleReminder,
+        catchUpReminders,
+        loadSampleGarden,
+      }}
+    >
       {children}
     </GardenContext.Provider>
   );
