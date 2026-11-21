@@ -22,6 +22,7 @@ import {
   WeatherMode,
 } from '../../context/GardenContext';
 import { TROUBLE_GUIDE, TroubleCategory } from '../../data/troubleGuide';
+import { useSubscription } from "../../utils/useSubscription";
 
 const TROUBLE_CATEGORIES: ('All' | TroubleCategory)[] = [
   'All',
@@ -46,6 +47,7 @@ const PRESERVATION_METHODS: PreservationMethod[] = ['Dehydrating', 'Canning', 'P
 const WEATHER_MODES: WeatherMode[] = ['Normal', 'Hot / Dry Spell', 'Rain Day'];
 
 export default function CareScreen() {
+  const { isPro, canExportData, setTestProEnabled } = useSubscription(false);
   const {
     plants,
     fertilizers,
@@ -864,7 +866,51 @@ export default function CareScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </ScrollView>
+    
+        {/* Pro Feature Gate Example (canExportData) */}
+        <View
+          style={{
+            marginTop: 12,
+            padding: 14,
+            borderRadius: 14,
+            backgroundColor: "#f0fdf4",
+            borderWidth: 1,
+            borderColor: "#bbf7d0",
+            gap: 8,
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: "800", color: "#14532d" }}>
+            {canExportData ? "Export Logs (Pro Active)" : "Export Logs (Pro)"}
+          </Text>
+          <Text style={{ fontSize: 12, color: "#166534" }}>
+            {canExportData
+              ? "Pro access is active — ready to export your care, dehydrator, and canning logs."
+              : "Upgrade to Pro to export care logs, dehydrator runs, and preservation batches."}
+          </Text>
+          {!canExportData ? (
+            <TouchableOpacity
+              onPress={() => setTestProEnabled(true)}
+              style={{
+                alignSelf: "flex-start",
+                paddingVertical: 8,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                backgroundColor: "#15803d",
+              }}
+            >
+              <Text style={{ color: "#ffffff", fontWeight: "700", fontSize: 12 }}>
+                Enable Dev Test Pro
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => setTestProEnabled(false)}>
+              <Text style={{ fontSize: 11, color: "#475569", fontWeight: "700" }}>
+                Reset dev Pro preview
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
   );
 }
 
