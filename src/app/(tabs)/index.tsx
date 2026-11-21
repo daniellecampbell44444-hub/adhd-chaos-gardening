@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share } from 'react-native';
+import { AdminConsoleScreen } from '../../components/AdminConsoleScreen';
 import { useGarden } from '../../context/GardenContext';
+import { useAdminAccess } from '../../utils/adminAccess';
 
 interface WeatherData {
   currentTemp: number;
@@ -19,6 +21,7 @@ interface WeatherData {
 
 const WEATHER_URL =
   'https://api.open-meteo.com/v1/forecast?latitude=-33.765&longitude=150.870&current=temperature_2m,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Australia%2FSydney&forecast_days=2';
+const expectedAdminPasscode = process.env.EXPO_PUBLIC_ADMIN_DEV_PASSCODE;
 
 function describeWeather(code: number) {
   if (code === 0) return { icon: '☀️', label: 'Clear skies' };
@@ -538,6 +541,11 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
+  const { isAdmin, unlockAdmin, lockAdmin } = useAdminAccess();
+  const [adminPasscode, setAdminPasscode] = useState('');
+  const [adminMessage, setAdminMessage] = useState<string | null>(null);
+  const [showAdminUnlockModal, setShowAdminUnlockModal] = useState(false);
+  const [showAdminConsole, setShowAdminConsole] = useState(false);
 
   const fetchWeather = useCallback(async () => {
     setLoadingWeather(true);
@@ -586,6 +594,46 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         'Your garden will now auto-sync to the cloud.'
       );
     }
+  };
+
+  const verifyAdminPasscode = (passcode: string) => {
+    if (!expectedAdminPasscode) return false;
+    return unlockAdmin(passcode, expectedAdminPasscode);
+  };
+
+  const handleAdminUnlock = () => {
+    if (!expectedAdminPasscode) {
+      setAdminMessage('Admin access is not configured in this build.');
+      return;
+    }
+    if (!verifyAdminPasscode(adminPasscode)) {
+      setAdminMessage('Admin access denied.');
+      return;
+    }
+    setAdminPasscode('');
+    setAdminMessage(null);
+    setShowAdminUnlockModal(false);
+    setShowAdminConsole(true);
+  };
+
+  const handleAdminEntryPress = () => {
+    if (isAdmin) {
+      setShowAdminConsole(true);
+      return;
+    }
+    setAdminMessage(null);
+    setShowAdminUnlockModal(true);
+  };
+
+  const handleCloseAdminUnlock = () => {
+    setShowAdminUnlockModal(false);
+    setAdminPasscode('');
+    setAdminMessage(null);
+  };
+
+  const handleAdminLock = () => {
+    lockAdmin();
+    setShowAdminConsole(false);
   };
 
   const totalPlants = plants.reduce((s, p) => s + p.quantity, 0);
@@ -859,6 +907,15 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         </TouchableOpacity>
       )}
 
+      <TouchableOpacity
+        onPress={handleAdminEntryPress}
+        style={{ alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 }}
+        accessibilityRole="button"
+        accessibilityLabel={isAdmin ? 'Open Admin console' : 'Unlock Admin console'}
+      >
+        <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '600' }}>Admin</Text>
+      </TouchableOpacity>
+
       <Modal visible={modal !== 'none'} transparent animationType="slide">
         <View style={styles.modalBg}>
           <View style={styles.modalCard}>
@@ -916,6 +973,56 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
               </>
             )}
           </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showAdminUnlockModal && !isAdmin}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCloseAdminUnlock}
+      >
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Admin Access</Text>
+            <TextInput
+              value={adminPasscode}
+              onChangeText={setAdminPasscode}
+              onSubmitEditing={handleAdminUnlock}
+              placeholder="Enter dev/admin code"
+              secureTextEntry
+              autoCapitalize="none"
+              returnKeyType="done"
+              style={styles.input}
+            />
+            {adminMessage && <Text style={styles.alertBody}>{adminMessage}</Text>}
+            <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={handleCloseAdminUnlock}
+              >
+                <Text>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleAdminUnlock}>
+                <Text style={styles.saveText}>Unlock</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showAdminConsole && isAdmin}
+        animationType="slide"
+        onRequestClose={() => setShowAdminConsole(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#f0fdf4' }}>
+          <AdminConsoleScreen
+            isAdmin={isAdmin}
+            onUnlock={verifyAdminPasscode}
+            onLock={handleAdminLock}
+            onClose={() => setShowAdminConsole(false)}
+          />
         </View>
       </Modal>
     </ScrollView>
