@@ -541,11 +541,11 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authBusy, setAuthBusy] = useState(false);
-  const { isAdmin, unlockAdmin, lockAdmin } = useAdminAccess();
+  const { isAdmin, unlockAdmin, lockAdmin } = useAdminAccess(false);
   const [adminPasscode, setAdminPasscode] = useState('');
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [showAdminUnlockModal, setShowAdminUnlockModal] = useState(false);
-  const [showAdminConsole, setShowAdminConsole] = useState(false);
+  const [showAdminModal, setShowAdminModal] = useState(false);
 
   const fetchWeather = useCallback(async () => {
     setLoadingWeather(true);
@@ -613,12 +613,12 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
     setAdminPasscode('');
     setAdminMessage(null);
     setShowAdminUnlockModal(false);
-    setShowAdminConsole(true);
+    setShowAdminModal(true);
   };
 
   const handleAdminEntryPress = () => {
     if (isAdmin) {
-      setShowAdminConsole(true);
+      setShowAdminModal(true);
       return;
     }
     setAdminMessage(null);
@@ -633,7 +633,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
 
   const handleAdminLock = () => {
     lockAdmin();
-    setShowAdminConsole(false);
+    setShowAdminModal(false);
   };
 
   const totalPlants = plants.reduce((s, p) => s + p.quantity, 0);
@@ -907,14 +907,25 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity
-        onPress={handleAdminEntryPress}
-        style={{ alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 }}
-        accessibilityRole="button"
-        accessibilityLabel={isAdmin ? 'Open Admin console' : 'Unlock Admin console'}
-      >
-        <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '600' }}>Admin</Text>
-      </TouchableOpacity>
+      {isAdmin ? (
+        <TouchableOpacity
+          onPress={handleAdminEntryPress}
+          style={{ alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel="Open Admin console"
+        >
+          <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '600' }}>Open Admin</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          onPress={handleAdminEntryPress}
+          style={{ alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 }}
+          accessibilityRole="button"
+          accessibilityLabel="Unlock Admin console"
+        >
+          <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '600' }}>Admin</Text>
+        </TouchableOpacity>
+      )}
 
       <Modal visible={modal !== 'none'} transparent animationType="slide">
         <View style={styles.modalBg}>
@@ -1011,20 +1022,22 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         </View>
       </Modal>
 
-      <Modal
-        visible={showAdminConsole && isAdmin}
-        animationType="slide"
-        onRequestClose={() => setShowAdminConsole(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: '#f0fdf4' }}>
-          <AdminConsoleScreen
-            isAdmin={isAdmin}
-            onUnlock={verifyAdminPasscode}
-            onLock={handleAdminLock}
-            onClose={() => setShowAdminConsole(false)}
-          />
-        </View>
-      </Modal>
+      {isAdmin && showAdminModal && (
+        <Modal
+          visible
+          animationType="slide"
+          onRequestClose={() => setShowAdminModal(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: '#f0fdf4' }}>
+            <AdminConsoleScreen
+              isAdmin={isAdmin}
+              onUnlock={verifyAdminPasscode}
+              onLock={handleAdminLock}
+              onClose={() => setShowAdminModal(false)}
+            />
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 }
