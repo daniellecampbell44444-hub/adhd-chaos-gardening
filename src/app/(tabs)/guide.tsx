@@ -16,27 +16,38 @@ import {
   getSeasonNotes,
   getPlantingForMonth,
 } from '../../data/westernSydneyCalendar';
+import {
+  getChecklistForSeason,
+  CROP_ROTATION_RULES,
+} from '../../data/rotationAndCare';
 
 export default function GuideScreen() {
   const { plants, addReminder } = useGarden();
   const [selectedMonth, setSelectedMonth] = useState<number>(11); // November
+  const [checkedIds, setCheckedIds] = useState<Record<string, boolean>>({});
+  const [showRotation, setShowRotation] = useState<boolean>(true);
   const [showLibrary, setShowLibrary] = useState<boolean>(false);
 
   const season = getSeasonForMonth(selectedMonth);
   const seasonNotes = getSeasonNotes(selectedMonth);
   const monthlyEntries = getPlantingForMonth(selectedMonth);
+  const seasonalChecklist = getChecklistForSeason(season);
 
-  const handleAddPlantingReminder = (crop: string, action: string, monthName: string) => {
-    addReminder(`${action}: ${crop} (Western Sydney ${monthName})`, monthName);
-    Alert.alert('Reminder added', `Added ${action} for ${crop} to your reminders.`);
+  const toggleChecklistItem = (id: string) => {
+    setCheckedIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleAddPlantingReminder = (title: string, dueLabel: string) => {
+    addReminder(title, dueLabel);
+    Alert.alert('Reminder added', 'Added to your reminders list.');
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.tag}>WESTERN SYDNEY / NSW CALENDAR</Text>
-          <Text style={styles.title}>Seasonal Planting Guide</Text>
+          <Text style={styles.tag}>WESTERN SYDNEY / NSW GUIDE</Text>
+          <Text style={styles.title}>Seasonal Planting & Care</Text>
           <Text style={styles.headerSub}>
             {MONTHS_FULL[selectedMonth - 1]} • {season}
           </Text>
@@ -79,6 +90,48 @@ export default function GuideScreen() {
         <Text style={styles.seasonNote}>{seasonNotes}</Text>
       </View>
 
+      {/* Seasonal Garden Care Checklist */}
+      <View style={styles.card}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>{season} Yard Care Checklist</Text>
+          <Text style={styles.countBadge}>
+            {seasonalChecklist.filter(item => checkedIds[item.id]).length}/{seasonalChecklist.length} done
+          </Text>
+        </View>
+
+        {seasonalChecklist.map(item => {
+          const isDone = !!checkedIds[item.id];
+          return (
+            <View key={item.id} style={styles.checkCard}>
+              <TouchableOpacity
+                style={styles.rowBetween}
+                onPress={() => toggleChecklistItem(item.id)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cropTitle, isDone && styles.doneText]}>
+                    {isDone ? '✓ ' : '○ '}
+                    {item.title}
+                  </Text>
+                  <Text style={styles.metaText}>{item.zoneTag}</Text>
+                </View>
+              </TouchableOpacity>
+
+              <Text style={styles.tipText}>{item.detail}</Text>
+
+              <TouchableOpacity
+                style={styles.remindBtn}
+                onPress={() =>
+                  handleAddPlantingReminder(item.title, `${season} Yard Care`)
+                }
+              >
+                <Ionicons name="alarm-outline" size={14} color="#14532d" />
+                <Text style={styles.remindBtnText}>Save as Reminder</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </View>
+
       {/* What to Sow / Plant This Month */}
       <View style={styles.card}>
         <View style={styles.rowBetween}>
@@ -117,8 +170,7 @@ export default function GuideScreen() {
                 style={styles.remindBtn}
                 onPress={() =>
                   handleAddPlantingReminder(
-                    item.crop,
-                    item.action,
+                    `${item.action}: ${item.crop} (Western Sydney ${MONTHS_FULL[selectedMonth - 1]})`,
                     MONTHS_FULL[selectedMonth - 1]
                   )
                 }
@@ -129,6 +181,35 @@ export default function GuideScreen() {
             </View>
           );
         })}
+      </View>
+
+      {/* Crop Rotation Guide */}
+      <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.rowBetween}
+          onPress={() => setShowRotation(!showRotation)}
+        >
+          <Text style={styles.sectionTitle}>Crop Family Rotation Guide</Text>
+          <Ionicons
+            name={showRotation ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color="#14532d"
+          />
+        </TouchableOpacity>
+
+        {showRotation &&
+          CROP_ROTATION_RULES.map(rule => (
+            <View key={rule.family} style={styles.entryCard}>
+              <Text style={styles.cropTitle}>{rule.shortLabel}</Text>
+              <Text style={styles.metaText}>
+                {rule.restYearsRecommended > 0
+                  ? `Rotate beds every ${rule.restYearsRecommended}+ season(s)`
+                  : 'Permanent / perennial placement'}{' '}
+                • Follow with: {rule.followWith}
+              </Text>
+              <Text style={styles.tipText}>{rule.soilNote}</Text>
+            </View>
+          ))}
       </View>
 
       {/* Optional Crop Pot & Temp Reference */}
@@ -219,6 +300,15 @@ const styles = StyleSheet.create({
   monthChipText: { fontSize: 12, fontWeight: '700', color: '#334155' },
   monthChipTextActive: { color: '#ffffff' },
   seasonNote: { fontSize: 12, color: '#334155', lineHeight: 18 },
+  checkCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  doneText: { textDecorationLine: 'line-through', color: '#64748b' },
   entryCard: {
     backgroundColor: '#f8fafc',
     borderRadius: 12,
