@@ -66,6 +66,7 @@ export default function PulseScreen() {
   const [modal, setModal] = useState<'none' | 'harvest' | 'expense' | 'auth'>('none');
   const [crop, setCrop] = useState('');
   const [grams, setGrams] = useState('');
+const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","grams":250},{"label":"500g","grams":500},{"label":"1kg","grams":1000},{"label":"2kg","grams":2000}];
   const [expItem, setExpItem] = useState('');
   const [expCost, setExpCost] = useState('');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -431,6 +432,7 @@ export default function PulseScreen() {
                 <Text style={styles.modalTitle}>Log Harvest Yield</Text>
                 <TextInput placeholder="Crop name (e.g. Tommy Toe Tomato)" value={crop} onChangeText={setCrop} style={styles.input} />
                 <TextInput placeholder="Weight in grams (e.g. 500)" value={grams} onChangeText={setGrams} keyboardType="numeric" style={styles.input} />
+<View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 4 }}>{QUICK_HARVEST_WEIGHTS.map(w => (<TouchableOpacity key={w.label} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: grams === String(w.grams) ? "#15803d" : "#f0fdf4", borderWidth: 1, borderColor: grams === String(w.grams) ? "#15803d" : "#bbf7d0" }} onPress={() => setGrams(String(w.grams))}><Text style={{ fontSize: 12, fontWeight: "800", color: grams === String(w.grams) ? "#ffffff" : "#14532d" }}>{w.label}</Text></TouchableOpacity>))}</View>
                 <View style={styles.modalRow}>
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => setModal('none')}><Text>Cancel</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.saveBtn} onPress={saveHarvest}><Text style={styles.saveText}>Save Harvest</Text></TouchableOpacity>
