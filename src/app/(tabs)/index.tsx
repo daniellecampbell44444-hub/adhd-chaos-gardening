@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useGarden } from '../../context/GardenContext';
 
 interface WeatherData {
@@ -29,9 +29,33 @@ function describeWeather(code: number) {
   return { icon: '🌤️', label: 'Mild' };
 }
 
+function getPreservationIdea(cropName: string, grams: number): string {
+  const name = cropName.toLowerCase();
+  const weightLabel = grams >= 1000 ? `${(grams / 1000).toFixed(2)}kg` : `${grams}g`;
+  if (name.includes('tomato')) {
+    return `${cropName} (${weightLabel}): Simmer into rich passata, BBQ sauce, or dehydrate slices into sundried tomatoes.`;
+  }
+  if (name.includes('chilli') || name.includes('pepper') || name.includes('capsicum')) {
+    return `${cropName} (${weightLabel}): Dehydrate for chilli flakes/powder, blend into hot sauce, or pickle whole.`;
+  }
+  if (name.includes('lemon') || name.includes('orange') || name.includes('citrus')) {
+    return `${cropName} (${weightLabel}): Juice & freeze in cubes, make curd, or candy the peels and save scraps for pectin.`;
+  }
+  if (name.includes('strawberry') || name.includes('blueberry') || name.includes('berry') || name.includes('fruit')) {
+    return `${cropName} (${weightLabel}): Dehydrate fruit leather/slices, simmer into jam/compote, or freeze on trays.`;
+  }
+  if (name.includes('cucumber') || name.includes('onion') || name.includes('zucchini')) {
+    return `${cropName} (${weightLabel}): Quick-pickle in spiced brine, grate & freeze for baking, or slice for dehydrating.`;
+  }
+  if (name.includes('potato') || name.includes('carrot') || name.includes('sweet potato')) {
+    return `${cropName} (${weightLabel}): Dehydrate into slices or mash powder, roast & freeze, or store cool and dark.`;
+  }
+  return `${cropName} (${weightLabel}): Dehydrate, blanch & freeze, or turn surplus into sauces/powders before it spoils.`;
+}
+
 export default function PulseScreen() {
   const {
-    plants, harvests, expenses, reminders, user, syncStatus,
+    plants, harvests, expenses, reminders, seeds, user, syncStatus,
     signUp, signIn, signOut, waterAll, feedAll, addHarvest, addExpense,
     toggleReminder, catchUpReminders, loadSampleGarden,
   } = useGarden();
@@ -110,6 +134,20 @@ export default function PulseScreen() {
   const highRain = weather ? Math.max(weather.todayRain, weather.tomorrowRain) : 0;
   const wInfo = weather ? describeWeather(weather.code) : null;
   const syncLabel = !user ? 'Cloud Backup' : syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Sync Error' : 'Synced ✓';
+
+  // Surplus harvests (>= 400g) that can be preserved or turned into kitchen staples
+  const surplusHarvests = harvests
+    .filter(h => h.grams >= 400)
+    .slice(0, 3)
+    .map(h => ({
+      id: h.id,
+      text: getPreservationIdea(h.crop, h.grams),
+    }));
+
+  // Low-seed alerts for stocked seeds running low (excluding pure wishlist items)
+  const lowSeedItems = seeds.filter(
+    s => !s.wishlist && (s.packets <= 1 || s.approxSeeds <= 15)
+  );
 
   // Build up to 3 high-impact focus items without overwhelming the screen
   const focusItems: { id: string; label: string; meta: string; onPress: () => void }[] = [];
@@ -257,6 +295,26 @@ export default function PulseScreen() {
           ))
         )}
       </View>
+
+      {surplusHarvests.length > 0 && (
+        <View style={styles.pantryCard}>
+          <Text style={styles.pantryTitle}>🫙 Surplus Preservation Ideas</Text>
+          {surplusHarvests.map(tip => (
+            <Text key={tip.id} style={styles.pantryLine}>• {tip.text}</Text>
+          ))}
+        </View>
+      )}
+
+      {lowSeedItems.length > 0 && (
+        <View style={styles.seedAlertCard}>
+          <Text style={styles.seedAlertTitle}>🌱 Low-Seed Alerts ({lowSeedItems.length})</Text>
+          {lowSeedItems.slice(0, 4).map(s => (
+            <Text key={s.id} style={styles.seedAlertLine}>
+              • {s.variety} {s.name}: {s.packets} pkt (~{s.approxSeeds} seeds left)
+            </Text>
+          ))}
+        </View>
+      )}
 
       {weather && peakMax >= 38 && (
         <View style={[styles.alertCard, styles.alertHeat]}>
@@ -426,6 +484,12 @@ const styles = StyleSheet.create({
   focusNumText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   focusItemText: { fontSize: 13, fontWeight: '700', color: '#0f172a' },
   focusMeta: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  pantryCard: { backgroundColor: '#ecfdf5', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#6ee7b7', gap: 6 },
+  pantryTitle: { fontSize: 13, fontWeight: '800', color: '#065f46' },
+  pantryLine: { fontSize: 12, color: '#064e3b', lineHeight: 17 },
+  seedAlertCard: { backgroundColor: '#fffbeb', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#fcd34d', gap: 5 },
+  seedAlertTitle: { fontSize: 13, fontWeight: '800', color: '#92400e' },
+  seedAlertLine: { fontSize: 12, color: '#78350f', lineHeight: 17 },
   alertCard: { borderRadius: 14, padding: 14, borderWidth: 1 },
   alertHeat: { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
   alertWarm: { backgroundColor: '#fef3c7', borderColor: '#fcd34d' },
