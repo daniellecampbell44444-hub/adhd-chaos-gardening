@@ -66,7 +66,7 @@ export function WarmBannerCard({
 const styles = StyleSheet.create({
   card: {
     width: "100%",
-    borderRadius: 16,
+    borderRadius: WARM_THEME.radiusCard,
     backgroundColor: WARM_THEME.surface,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
@@ -74,7 +74,8 @@ const styles = StyleSheet.create({
   },
   bannerImage: {
     width: "100%",
-    height: 156,
+    height: 150,
+    borderRadius: 14,
     backgroundColor: WARM_THEME.surfaceMuted,
   },
   body: {

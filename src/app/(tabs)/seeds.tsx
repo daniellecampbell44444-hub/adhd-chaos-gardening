@@ -9,7 +9,9 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { WARM_THEME } from '../../utils/warmTheme';
 import {
   useGarden,
   PLANT_LIBRARY,
@@ -102,19 +104,19 @@ export default function SeedsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea}><ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.tag}>STASH, PROPAGATION & VALUE</Text>
           <Text style={styles.title}>Seeds & Cuttings</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => setPropModalVisible(true)}>
-            <Ionicons name="git-branch" size={16} color="#14532d" />
+            <Ionicons name="git-branch" size={16} color={WARM_THEME.accent} />
             <Text style={styles.secondaryBtnText}>+ Cutting</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.primaryBtn} onPress={() => setSeedModalVisible(true)}>
-            <Ionicons name="add" size={18} color="#ffffff" />
+            <Ionicons name="add" size={18} color={WARM_THEME.accentText} />
             <Text style={styles.primaryBtnText}>Seed</Text>
           </TouchableOpacity>
         </View>
@@ -137,7 +139,7 @@ export default function SeedsScreen() {
           propagations.map(item => (
             <View key={item.id} style={styles.propCard}>
               <View style={styles.rowBetween}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.itemTitle}>
                     {item.quantity}× {item.variety} {item.name}
                   </Text>
@@ -187,7 +189,7 @@ export default function SeedsScreen() {
         ) : (
           seeds.map(s => (
             <View key={s.id} style={styles.seedRow}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.itemTitle}>
                   {s.variety} {s.name} {s.wishlist ? '• Wishlist' : ''}
                 </Text>
@@ -231,15 +233,15 @@ export default function SeedsScreen() {
         <View style={styles.ledgerRow}>
           <View style={styles.ledgerBox}>
             <Text style={styles.sub}>Harvest Value</Text>
-            <Text style={[styles.ledgerNum, { color: '#15803d' }]}>${earned.toFixed(2)}</Text>
+            <Text style={[styles.ledgerNum, { color: WARM_THEME.accentWarm }]}>${earned.toFixed(2)}</Text>
           </View>
           <View style={styles.ledgerBox}>
             <Text style={styles.sub}>Garden Costs</Text>
-            <Text style={[styles.ledgerNum, { color: '#b91c1c' }]}>${spent.toFixed(2)}</Text>
+            <Text style={[styles.ledgerNum, { color: WARM_THEME.danger }]}>${spent.toFixed(2)}</Text>
           </View>
           <View style={styles.ledgerBox}>
             <Text style={styles.sub}>Net Difference</Text>
-            <Text style={[styles.ledgerNum, { color: net >= 0 ? '#14532d' : '#b91c1c' }]}>
+            <Text style={[styles.ledgerNum, { color: net >= 0 ? WARM_THEME.accent : WARM_THEME.danger }]}>
               {net >= 0 ? `+$${net.toFixed(2)}` : `-$${Math.abs(net).toFixed(2)}`}
             </Text>
           </View>
@@ -301,7 +303,7 @@ export default function SeedsScreen() {
               />
 
               <View style={styles.twoCol}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 130 }}>
                   <Text style={styles.fieldLabel}>Packets</Text>
                   <TextInput
                     value={packetsText}
@@ -310,7 +312,7 @@ export default function SeedsScreen() {
                     style={styles.input}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 130 }}>
                   <Text style={styles.fieldLabel}>Approx Seeds</Text>
                   <TextInput
                     value={approxSeedsText}
@@ -358,7 +360,7 @@ export default function SeedsScreen() {
               <Text style={styles.modalTitle}>Log Cutting or Division</Text>
 
               <Text style={styles.fieldLabel}>Quick Pick Crop</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.wrapRow}>
                 {['Sweet Basil', 'Mint', 'Rosemary', 'Thyme', 'Sweet Potato', 'Strawberry'].map(
                   crop => (
                     <TouchableOpacity
@@ -377,7 +379,7 @@ export default function SeedsScreen() {
                     </TouchableOpacity>
                   )
                 )}
-              </ScrollView>
+              </View>
 
               <Text style={styles.fieldLabel}>Plant Name</Text>
               <TextInput
@@ -506,71 +508,90 @@ export default function SeedsScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0fdf4' },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
+  safeArea: { flex: 1, backgroundColor: WARM_THEME.background },
+  container: { flex: 1, backgroundColor: WARM_THEME.background },
+  content: { padding: WARM_THEME.spacingScreen, gap: 12, paddingBottom: 32 },
   header: {
-    backgroundColor: '#14532d',
-    borderRadius: 18,
+    backgroundColor: WARM_THEME.accent,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 16,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
-  tag: { color: '#86efac', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  title: { color: '#ffffff', fontSize: 20, fontWeight: '800', marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tag: { color: WARM_THEME.accentSoft, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  title: { color: WARM_THEME.accentText, fontSize: 20, fontWeight: '800', marginTop: 2 },
+  headerActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
   secondaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  secondaryBtnText: { color: '#14532d', fontSize: 12, fontWeight: '800' },
+  secondaryBtnText: { color: WARM_THEME.accent, fontSize: 12, fontWeight: '800' },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#16a34a',
+    backgroundColor: WARM_THEME.accentWarm,
     paddingHorizontal: 11,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  primaryBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  primaryBtnText: { color: WARM_THEME.accentText, fontSize: 12, fontWeight: '800' },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 14,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderColor: WARM_THEME.border,
   },
   rowBetween: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#14532d' },
-  linkText: { fontSize: 12, fontWeight: '800', color: '#15803d' },
-  itemTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
-  sub: { fontSize: 12, color: '#64748b', marginTop: 2, lineHeight: 17 },
-  notesText: { fontSize: 12, color: '#334155', marginTop: 4, fontStyle: 'italic' },
+  sectionTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 15,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  linkText: { fontSize: 12, fontWeight: '800', color: WARM_THEME.accent },
+  itemTitle: { fontSize: 14, fontWeight: '800', color: WARM_THEME.textPrimary },
+  sub: { fontSize: 12, color: WARM_THEME.textSecondary, marginTop: 2, lineHeight: 17 },
+  notesText: {
+    fontSize: 12,
+    color: WARM_THEME.textSecondary,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   propCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: WARM_THEME.surface,
     borderRadius: 12,
     padding: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: WARM_THEME.border,
   },
   propActions: {
     flexDirection: 'row',
@@ -580,116 +601,127 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   statusPill: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#fcd34d',
+    borderColor: WARM_THEME.accentWarm,
   },
-  statusPillText: { fontSize: 11, fontWeight: '800', color: '#92400e' },
+  statusPillText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accentWarm },
   potUpBtn: {
-    backgroundColor: '#15803d',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 10,
   },
-  potUpText: { fontSize: 11, fontWeight: '800', color: '#ffffff' },
+  potUpText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accentText },
   seedRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: WARM_THEME.border,
   },
-  counterGroup: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  counterGroup: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
   miniBtn: {
     width: 24,
     height: 24,
     borderRadius: 7,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: WARM_THEME.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  miniBtnText: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
-  pktText: { fontSize: 11, fontWeight: '700', color: '#334155' },
+  miniBtnText: { fontSize: 15, fontWeight: '800', color: WARM_THEME.textPrimary },
+  pktText: { fontSize: 11, fontWeight: '700', color: WARM_THEME.textSecondary },
   sowBtn: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  sowText: { fontSize: 11, fontWeight: '800', color: '#14532d' },
-  del: { fontSize: 14, color: '#94a3b8', fontWeight: '700', paddingHorizontal: 4 },
-  ledgerRow: { flexDirection: 'row', gap: 8 },
+  sowText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accent },
+  del: { fontSize: 14, color: WARM_THEME.textSecondary, fontWeight: '700', paddingHorizontal: 4 },
+  ledgerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   ledgerBox: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    minWidth: 130,
+    backgroundColor: WARM_THEME.surfaceMuted,
     borderRadius: 12,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: WARM_THEME.border,
   },
   ledgerNum: { fontSize: 15, fontWeight: '800', marginTop: 4 },
   logRow: {
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: WARM_THEME.border,
   },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalScroll: { flexGrow: 1, justifyContent: 'center', padding: 18 },
-  modalCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 18, gap: 10 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#14532d' },
-  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#334155' },
+  modalCard: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: WARM_THEME.textSecondary },
   presetChip: {
     paddingHorizontal: 11,
     paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#f1f5f9',
-    marginRight: 6,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.surfaceMuted,
   },
-  presetChipActive: { backgroundColor: '#15803d' },
-  presetChipText: { fontSize: 12, fontWeight: '600', color: '#334155' },
-  presetChipTextActive: { color: '#ffffff' },
+  presetChipActive: { backgroundColor: WARM_THEME.accent },
+  presetChipText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
+  presetChipTextActive: { color: WARM_THEME.accentText },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 14,
+    color: WARM_THEME.textPrimary,
+    backgroundColor: WARM_THEME.surface,
   },
-  twoCol: { flexDirection: 'row', gap: 10 },
+  twoCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   choicePill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
   },
-  choicePillActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
-  choicePillText: { fontSize: 12, fontWeight: '600', color: '#334155' },
-  choicePillTextActive: { color: '#ffffff' },
+  choicePillActive: { backgroundColor: WARM_THEME.accent, borderColor: WARM_THEME.accent },
+  choicePillText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
+  choicePillTextActive: { color: WARM_THEME.accentText },
   wishToggle: {
     paddingVertical: 8,
   },
-  wishToggleText: { fontSize: 13, fontWeight: '700', color: '#14532d' },
+  wishToggleText: { fontSize: 13, fontWeight: '700', color: WARM_THEME.accent },
   modalActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 12,
     marginTop: 6,
   },
-  cancelText: { color: '#475569', fontWeight: '700' },
+  cancelText: { color: WARM_THEME.textSecondary, fontWeight: '700' },
   saveBtn: {
-    backgroundColor: '#15803d',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  saveText: { color: '#ffffff', fontWeight: '800' },
+  saveText: { color: WARM_THEME.accentText, fontWeight: '800' },
 });

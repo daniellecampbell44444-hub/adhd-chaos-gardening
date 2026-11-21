@@ -9,7 +9,9 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { WARM_THEME } from '../../utils/warmTheme';
 import {
   useGarden,
   getSmartFeed,
@@ -210,19 +212,19 @@ export default function CareScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea}><ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.tag}>SMART CARE, WEATHER & SOIL</Text>
           <Text style={styles.title}>Care, Water & Soil</Text>
         </View>
         <View style={styles.headerBtns}>
           <TouchableOpacity style={styles.waterBtn} onPress={waterDuePlants}>
-            <Ionicons name="water" size={15} color="#ffffff" />
+            <Ionicons name="water" size={15} color={WARM_THEME.accentText} />
             <Text style={styles.btnText}>Water Due ({dueCount})</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.feedBtn} onPress={feedAll}>
-            <Ionicons name="leaf" size={15} color="#ffffff" />
+            <Ionicons name="leaf" size={15} color={WARM_THEME.accentText} />
             <Text style={styles.btnText}>Feed All</Text>
           </TouchableOpacity>
         </View>
@@ -309,7 +311,7 @@ export default function CareScreen() {
             const dueInfo = getWateringDueInfo(p, weatherMode);
             return (
               <View key={p.id} style={styles.plantRow}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={styles.titleRow}>
                     <Text style={styles.itemTitle}>
                       {p.variety} {p.name} ({p.quantity})
@@ -361,7 +363,7 @@ export default function CareScreen() {
         ) : (
           soilLogs.map(log => (
             <View key={log.id} style={styles.soilRow}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.itemTitle}>
                   {log.site} • {log.careType}
                 </Text>
@@ -389,7 +391,7 @@ export default function CareScreen() {
           Tap a symptom category to spot likely causes and low-stress fixes fast.
         </Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+        <View style={styles.wrapRow}>
           {TROUBLE_CATEGORIES.map(cat => {
             const active = selectedTroubleCategory === cat;
             return (
@@ -404,7 +406,7 @@ export default function CareScreen() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         {visibleTroubles.map(entry => {
           const isOpen = expandedTroubleId === entry.id;
@@ -423,14 +425,14 @@ export default function CareScreen() {
                 style={styles.rowBetween}
                 onPress={() => setExpandedTroubleId(isOpen ? null : entry.id)}
               >
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.itemTitle}>{entry.title}</Text>
                   <Text style={styles.sub}>{entry.symptoms}</Text>
                 </View>
                 <Ionicons
                   name={isOpen ? 'chevron-up' : 'chevron-down'}
                   size={18}
-                  color="#14532d"
+                  color={WARM_THEME.accent}
                 />
               </TouchableOpacity>
 
@@ -464,7 +466,7 @@ export default function CareScreen() {
                     style={styles.remindActionBtn}
                     onPress={() => handleCreateTroubleReminder(entry.reminderTitle)}
                   >
-                    <Ionicons name="alarm-outline" size={15} color="#14532d" />
+                    <Ionicons name="alarm-outline" size={15} color={WARM_THEME.accent} />
                     <Text style={styles.remindActionText}>Add Check Reminder</Text>
                   </TouchableOpacity>
                 </View>
@@ -496,7 +498,7 @@ export default function CareScreen() {
         ) : (
           fertilizers.map(f => (
             <View key={f.id} style={styles.fertRow}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.itemTitle}>
                   {f.brand} — {f.name}
                 </Text>
@@ -561,7 +563,7 @@ export default function CareScreen() {
             value={scratchpadText}
             onChangeText={setScratchpadText}
             placeholder="e.g. Curled tip on Jalapeño pot, check for mites..."
-            style={[styles.input, { flex: 1 }]}
+            style={[styles.input, { flex: 1, minWidth: 0 }]}
             onSubmitEditing={handleQuickScratchpadAdd}
             returnKeyType="done"
           />
@@ -575,7 +577,7 @@ export default function CareScreen() {
         ) : (
           sortedScratchpadNotes.map(note => (
             <View key={note.id} style={styles.scratchRow}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.itemTitle}>
                   {note.pinned ? '📌 ' : ''}
                   {note.text}
@@ -619,7 +621,7 @@ export default function CareScreen() {
           Track dehydrating trays, canning jars, pickling brines, bulk harvest weights, and scrap/peel repurposing.
         </Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+        <View style={styles.wrapRow}>
           {(['All', ...PRESERVATION_METHODS] as const).map(method => {
             const active = batchMethodFilter === method;
             return (
@@ -634,7 +636,7 @@ export default function CareScreen() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         {visibleBatches.length === 0 ? (
           <Text style={styles.sub}>
@@ -643,7 +645,7 @@ export default function CareScreen() {
         ) : (
           visibleBatches.map(batch => (
             <View key={batch.id} style={styles.soilRow}>
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.itemTitle}>
                   {batch.method} • {batch.produce}
                 </Text>
@@ -826,7 +828,7 @@ export default function CareScreen() {
               />
 
               <View style={styles.twoCol}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 130 }}>
                   <Text style={styles.fieldLabel}>Amount / Depth</Text>
                   <TextInput
                     value={amountLabel}
@@ -835,7 +837,7 @@ export default function CareScreen() {
                     style={styles.input}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 130 }}>
                   <Text style={styles.fieldLabel}>pH Note (Optional)</Text>
                   <TextInput
                     value={phEstimate}
@@ -868,21 +870,11 @@ export default function CareScreen() {
       </Modal>
     
         {/* Pro Feature Gate Example (canExportData) */}
-        <View
-          style={{
-            marginTop: 12,
-            padding: 14,
-            borderRadius: 14,
-            backgroundColor: "#f0fdf4",
-            borderWidth: 1,
-            borderColor: "#bbf7d0",
-            gap: 8,
-          }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: "800", color: "#14532d" }}>
+        <View style={styles.proCard}>
+          <Text style={styles.proTitle}>
             {canExportData ? "Export Logs (Pro Active)" : "Export Logs (Pro)"}
           </Text>
-          <Text style={{ fontSize: 12, color: "#166534" }}>
+          <Text style={styles.proDescription}>
             {canExportData
               ? "Pro access is active — ready to export your care, dehydrator, and canning logs."
               : "Upgrade to Pro to export care logs, dehydrator runs, and preservation batches."}
@@ -890,74 +882,73 @@ export default function CareScreen() {
           {!canExportData ? (
             <TouchableOpacity
               onPress={() => setTestProEnabled(true)}
-              style={{
-                alignSelf: "flex-start",
-                paddingVertical: 8,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                backgroundColor: "#15803d",
-              }}
+              style={styles.proButton}
             >
-              <Text style={{ color: "#ffffff", fontWeight: "700", fontSize: 12 }}>
+              <Text style={styles.proButtonText}>
                 Enable Dev Test Pro
               </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={() => setTestProEnabled(false)}>
-              <Text style={{ fontSize: 11, color: "#475569", fontWeight: "700" }}>
+              <Text style={styles.proResetText}>
                 Reset dev Pro preview
               </Text>
             </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0fdf4' },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
+  safeArea: { flex: 1, backgroundColor: WARM_THEME.background },
+  container: { flex: 1, backgroundColor: WARM_THEME.background },
+  content: { padding: WARM_THEME.spacingScreen, gap: 12, paddingBottom: 32 },
   header: {
-    backgroundColor: '#14532d',
-    borderRadius: 18,
+    backgroundColor: WARM_THEME.accent,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 16,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
-  tag: { color: '#86efac', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  title: { color: '#ffffff', fontSize: 20, fontWeight: '800', marginTop: 2 },
-  headerBtns: { flexDirection: 'row', gap: 8 },
+  tag: { color: WARM_THEME.accentSoft, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  title: { color: WARM_THEME.accentText, fontSize: 20, fontWeight: '800', marginTop: 2 },
+  headerBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   waterBtn: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#0284c7',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 10,
   },
   feedBtn: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#16a34a',
+    backgroundColor: WARM_THEME.accentWarm,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  btnText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  btnText: { color: WARM_THEME.accentText, fontSize: 12, fontWeight: '800' },
   card: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 14,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderColor: WARM_THEME.border,
   },
   rowBetween: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
@@ -970,51 +961,63 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   rowGap: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#14532d' },
+  sectionTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 15,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#15803d',
-    backgroundColor: '#dcfce7',
+    color: WARM_THEME.textSecondary,
+    backgroundColor: WARM_THEME.surfaceMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
   },
   dueAlertBadge: {
-    backgroundColor: '#fef3c7',
-    color: '#92400e',
+    backgroundColor: WARM_THEME.accentSoft,
+    color: WARM_THEME.accentWarm,
   },
-  weatherNote: { fontSize: 12, color: '#334155', lineHeight: 17 },
+  weatherNote: { fontSize: 12, color: WARM_THEME.textSecondary, lineHeight: 17 },
   dueActionBtn: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 10,
   },
-  dueActionBtnText: { fontSize: 12, fontWeight: '800', color: '#0369a1' },
+  dueActionBtnText: { fontSize: 12, fontWeight: '800', color: WARM_THEME.accentText },
   potActionBtn: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: WARM_THEME.accentWarm,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 10,
   },
-  potActionBtnText: { fontSize: 12, fontWeight: '800', color: '#92400e' },
+  potActionBtnText: { fontSize: 12, fontWeight: '800', color: WARM_THEME.accentText },
   filterToggle: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: WARM_THEME.surfaceMuted,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
   },
   filterToggleActive: {
-    backgroundColor: '#15803d',
-    borderColor: '#15803d',
+    backgroundColor: WARM_THEME.accent,
+    borderColor: WARM_THEME.accent,
   },
-  filterToggleText: { fontSize: 11, fontWeight: '800', color: '#334155' },
-  filterToggleTextActive: { color: '#ffffff' },
-  linkText: { fontSize: 12, fontWeight: '800', color: '#15803d' },
-  itemTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
+  filterToggleText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.textSecondary },
+  filterToggleTextActive: { color: WARM_THEME.accentText },
+  linkText: { fontSize: 12, fontWeight: '800', color: WARM_THEME.accent },
+  itemTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
   duePill: {
     fontSize: 10,
     fontWeight: '800',
@@ -1023,176 +1026,208 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   duePillActive: {
-    backgroundColor: '#fef3c7',
-    color: '#92400e',
+    backgroundColor: WARM_THEME.accentWarm,
+    color: WARM_THEME.accentText,
   },
   duePillCalm: {
-    backgroundColor: '#e0f2fe',
-    color: '#0369a1',
+    backgroundColor: WARM_THEME.surfaceMuted,
+    color: WARM_THEME.textSecondary,
   },
-  sub: { fontSize: 12, color: '#64748b', marginTop: 2, lineHeight: 17 },
-  notesItalic: { fontSize: 12, color: '#334155', marginTop: 3, fontStyle: 'italic' },
-  feedNote: { fontSize: 12, color: '#334155', marginTop: 4 },
+  sub: { fontSize: 12, color: WARM_THEME.textSecondary, marginTop: 2, lineHeight: 17 },
+  notesItalic: { fontSize: 12, color: WARM_THEME.textSecondary, marginTop: 3, fontStyle: 'italic' },
+  feedNote: { fontSize: 12, color: WARM_THEME.textSecondary, marginTop: 4 },
   soilRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 7,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: WARM_THEME.border,
   },
-  chipScroll: { flexGrow: 0, marginTop: 2 },
   filterChip: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: WARM_THEME.surfaceMuted,
     paddingHorizontal: 11,
     paddingVertical: 6,
     borderRadius: 16,
-    marginRight: 6,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
   },
-  filterChipActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
-  filterChipText: { fontSize: 11, fontWeight: '700', color: '#334155' },
-  filterChipTextActive: { color: '#ffffff' },
+  filterChipActive: { backgroundColor: WARM_THEME.accent, borderColor: WARM_THEME.accent },
+  filterChipText: { fontSize: 11, fontWeight: '700', color: WARM_THEME.textSecondary },
+  filterChipTextActive: { color: WARM_THEME.accentText },
   troubleBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: WARM_THEME.surface,
     borderRadius: 12,
     padding: 12,
     gap: 6,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: WARM_THEME.border,
   },
-  matchTag: { fontSize: 11, fontWeight: '700', color: '#15803d' },
+  matchTag: { fontSize: 11, fontWeight: '700', color: WARM_THEME.accent },
   troubleDetails: { marginTop: 4, gap: 4 },
-  detailHeading: { fontSize: 12, fontWeight: '800', color: '#14532d', marginTop: 4 },
-  detailBullet: { fontSize: 12, color: '#334155', lineHeight: 17 },
+  detailHeading: { fontSize: 12, fontWeight: '800', color: WARM_THEME.textPrimary, marginTop: 4 },
+  detailBullet: { fontSize: 12, color: WARM_THEME.textSecondary, lineHeight: 17 },
   remindActionBtn: {
     marginTop: 8,
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 9,
   },
-  remindActionText: { fontSize: 12, fontWeight: '800', color: '#14532d' },
+  remindActionText: { fontSize: 12, fontWeight: '800', color: WARM_THEME.accent },
   plantRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: WARM_THEME.border,
   },
   smallWater: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  smallWaterText: { fontSize: 11, fontWeight: '800', color: '#0369a1' },
+  smallWaterText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accentText },
   smallFeed: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.accentWarm,
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
   },
-  smallFeedText: { fontSize: 11, fontWeight: '800', color: '#15803d' },
+  smallFeedText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accentText },
   presetBtn: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 9,
   },
-  presetBtnText: { fontSize: 11, fontWeight: '800', color: '#14532d' },
+  presetBtnText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accent },
   fertRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: WARM_THEME.border,
   },
-  del: { fontSize: 14, color: '#94a3b8', fontWeight: '700', paddingHorizontal: 4 },
+  del: { fontSize: 14, color: WARM_THEME.textSecondary, fontWeight: '700', paddingHorizontal: 4 },
   miniSpotChip: {
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: WARM_THEME.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: WARM_THEME.border,
   },
   miniSpotChipActive: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#16a34a',
+    backgroundColor: WARM_THEME.accent,
+    borderColor: WARM_THEME.accent,
   },
-  miniSpotText: { fontSize: 11, fontWeight: '700', color: '#475569' },
-  miniSpotTextActive: { color: '#14532d' },
-  scratchInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  miniSpotText: { fontSize: 11, fontWeight: '700', color: WARM_THEME.textSecondary },
+  miniSpotTextActive: { color: WARM_THEME.accentText },
+  scratchInputRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   scratchRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: WARM_THEME.border,
   },
   miniActionPill: {
-    backgroundColor: '#f0fdf4',
+    backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: WARM_THEME.border,
   },
-  miniActionText: { fontSize: 11, fontWeight: '800', color: '#15803d' },
+  miniActionText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accent },
   remRow: {
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: WARM_THEME.border,
   },
-  doneText: { textDecorationLine: 'line-through', color: '#64748b' },
+  doneText: { textDecorationLine: 'line-through', color: WARM_THEME.textSecondary },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalScroll: { flexGrow: 1, justifyContent: 'center', padding: 18 },
-  modalCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 18, gap: 10 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#14532d' },
-  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#334155' },
+  modalCard: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: WARM_THEME.textSecondary },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   choicePill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
   },
-  choicePillActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
-  choicePillText: { fontSize: 12, fontWeight: '600', color: '#334155' },
-  choicePillTextActive: { color: '#ffffff' },
+  choicePillActive: { backgroundColor: WARM_THEME.accent, borderColor: WARM_THEME.accent },
+  choicePillText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
+  choicePillTextActive: { color: WARM_THEME.accentText },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 14,
+    color: WARM_THEME.textPrimary,
+    backgroundColor: WARM_THEME.surface,
   },
-  twoCol: { flexDirection: 'row', gap: 10 },
+  twoCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   modalActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 12,
     marginTop: 6,
   },
-  cancelText: { color: '#475569', fontWeight: '700' },
+  cancelText: { color: WARM_THEME.textSecondary, fontWeight: '700' },
   saveBtn: {
-    backgroundColor: '#15803d',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  saveText: { color: '#ffffff', fontWeight: '800' },
+  saveText: { color: WARM_THEME.accentText, fontWeight: '800' },
+  proCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: WARM_THEME.radiusCard,
+    backgroundColor: WARM_THEME.surface,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    gap: 8,
+  },
+  proTitle: { fontSize: 14, fontWeight: '800', color: WARM_THEME.textPrimary },
+  proDescription: { fontSize: 12, color: WARM_THEME.textSecondary },
+  proButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: WARM_THEME.accent,
+  },
+  proButtonText: { color: WARM_THEME.accentText, fontWeight: '700', fontSize: 12 },
+  proResetText: { fontSize: 11, color: WARM_THEME.textSecondary, fontWeight: '700' },
 });

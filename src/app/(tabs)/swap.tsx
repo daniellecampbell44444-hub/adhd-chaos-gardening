@@ -12,6 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { WARM_THEME } from '../../utils/warmTheme';
 import { useGarden } from '../../context/GardenContext';
 import { supabase } from '../../lib/supabase';
 
@@ -301,10 +303,10 @@ export default function SwapScreen() {
   });
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea}><ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerCard}>
         <View style={styles.headerTop}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.tag}>
               {isLive ? 'LIVE SUPABASE BOARD • MULTI-USER' : 'COMMUNITY SEED & PLANT BOARD'}
             </Text>
@@ -315,10 +317,10 @@ export default function SwapScreen() {
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.refreshChip} onPress={fetchListings}>
-              <Ionicons name="refresh" size={16} color="#dcfce7" />
+              <Ionicons name="refresh" size={16} color={WARM_THEME.accentText} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.postBtn} onPress={() => setModalVisible(true)}>
-              <Ionicons name="add-circle" size={18} color="#ffffff" />
+              <Ionicons name="add-circle" size={18} color={WARM_THEME.accentText} />
               <Text style={styles.postBtnText}>Post Item</Text>
             </TouchableOpacity>
           </View>
@@ -362,12 +364,12 @@ export default function SwapScreen() {
 
       {loading && listings.length === 0 ? (
         <View style={styles.emptyCard}>
-          <ActivityIndicator color="#15803d" />
+          <ActivityIndicator color={WARM_THEME.accent} />
           <Text style={styles.emptySub}>Loading live community listings...</Text>
         </View>
       ) : visibleListings.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Ionicons name="leaf-outline" size={28} color="#15803d" />
+          <Ionicons name="leaf-outline" size={28} color={WARM_THEME.accent} />
           <Text style={styles.emptyTitle}>No matching listings yet</Text>
           <Text style={styles.emptySub}>
             Tap Post Item to share extra seeds or potted plants with other gardeners.
@@ -396,7 +398,7 @@ export default function SwapScreen() {
               </View>
 
               <TouchableOpacity onPress={() => removeListing(item.id)}>
-                <Ionicons name="trash-outline" size={18} color="#94a3b8" />
+                <Ionicons name="trash-outline" size={18} color={WARM_THEME.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -408,7 +410,7 @@ export default function SwapScreen() {
 
             <View style={styles.cardFooter}>
               <View style={styles.locRow}>
-                <Ionicons name="location-outline" size={14} color="#15803d" />
+                <Ionicons name="location-outline" size={14} color={WARM_THEME.accent} />
                 <Text style={styles.locText}>{item.suburb}</Text>
               </View>
 
@@ -538,156 +540,187 @@ export default function SwapScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0fdf4' },
-  content: { padding: 16, gap: 14, paddingBottom: 32 },
-  headerCard: { backgroundColor: '#14532d', borderRadius: 20, padding: 18 },
-  headerTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  safeArea: { flex: 1, backgroundColor: WARM_THEME.background },
+  container: { flex: 1, backgroundColor: WARM_THEME.background },
+  content: { padding: WARM_THEME.spacingScreen, gap: 14, paddingBottom: 32 },
+  headerCard: {
+    backgroundColor: WARM_THEME.accent,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 18,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  headerActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   refreshChip: {
     backgroundColor: 'rgba(255,255,255,0.16)',
     padding: 10,
     borderRadius: 12,
   },
-  tag: { color: '#86efac', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
-  title: { color: '#ffffff', fontSize: 22, fontWeight: '800', marginTop: 2 },
-  subtitle: { color: '#dcfce7', fontSize: 13, marginTop: 4, lineHeight: 18 },
+  tag: { color: WARM_THEME.accentSoft, fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
+  title: { color: WARM_THEME.accentText, fontSize: 22, fontWeight: '800', marginTop: 2 },
+  subtitle: { color: WARM_THEME.accentSoft, fontSize: 13, marginTop: 4, lineHeight: 18 },
   postBtn: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#16a34a',
+    backgroundColor: WARM_THEME.accentWarm,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
   },
-  postBtnText: { color: '#ffffff', fontWeight: '800', fontSize: 13 },
+  postBtnText: { color: WARM_THEME.accentText, fontWeight: '800', fontSize: 13 },
   filterBlock: { gap: 8 },
-  chipRow: { flexDirection: 'row', gap: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: WARM_THEME.surface,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: WARM_THEME.border,
   },
-  chipActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
-  chipText: { fontSize: 12, fontWeight: '700', color: '#14532d' },
-  chipTextActive: { color: '#ffffff' },
+  chipActive: { backgroundColor: WARM_THEME.accent, borderColor: WARM_THEME.accent },
+  chipText: { fontSize: 12, fontWeight: '700', color: WARM_THEME.textSecondary },
+  chipTextActive: { color: WARM_THEME.accentText },
   chipOutline: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f8fafc',
+    backgroundColor: WARM_THEME.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
   },
-  chipOutlineActive: { backgroundColor: '#dcfce7', borderColor: '#15803d' },
-  chipOutlineText: { fontSize: 12, fontWeight: '600', color: '#475569' },
-  chipOutlineTextActive: { color: '#14532d', fontWeight: '700' },
+  chipOutlineActive: { backgroundColor: WARM_THEME.accentSoft, borderColor: WARM_THEME.accent },
+  chipOutlineText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
+  chipOutlineTextActive: { color: WARM_THEME.accent, fontWeight: '700' },
   emptyCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 24,
     alignItems: 'center',
     gap: 8,
     borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderColor: WARM_THEME.border,
   },
-  emptyTitle: { fontSize: 16, fontWeight: '800', color: '#14532d' },
-  emptySub: { fontSize: 13, color: '#475569', textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: WARM_THEME.textPrimary },
+  emptySub: { fontSize: 13, color: WARM_THEME.textSecondary, textAlign: 'center' },
   listingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 16,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderColor: WARM_THEME.border,
   },
-  claimedCard: { opacity: 0.72, backgroundColor: '#f8fafc' },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  badgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  offerBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  freeBadge: { backgroundColor: '#dcfce7' },
-  saleBadge: { backgroundColor: '#fef3c7' },
-  offerBadgeText: { fontSize: 11, fontWeight: '800', color: '#14532d' },
+  claimedCard: { opacity: 0.72, backgroundColor: WARM_THEME.surfaceMuted },
+  cardTop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  badgeRow: { flex: 1, minWidth: 0, flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  offerBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: WARM_THEME.radiusPill },
+  freeBadge: { backgroundColor: WARM_THEME.accent },
+  saleBadge: { backgroundColor: WARM_THEME.accentWarm },
+  offerBadgeText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accentText },
   typeBadge: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: WARM_THEME.surfaceMuted,
     paddingHorizontal: 9,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: WARM_THEME.radiusPill,
   },
-  typeBadgeText: { fontSize: 10, fontWeight: '700', color: '#334155' },
-  itemTitle: { fontSize: 17, fontWeight: '800', color: '#0f172a' },
-  itemVariety: { fontSize: 13, fontWeight: '600', color: '#15803d' },
-  itemNotes: { fontSize: 13, color: '#475569', lineHeight: 18 },
+  typeBadgeText: { fontSize: 10, fontWeight: '700', color: WARM_THEME.textSecondary },
+  itemTitle: { fontSize: 17, fontWeight: '800', color: WARM_THEME.textPrimary },
+  itemVariety: { fontSize: 13, fontWeight: '600', color: WARM_THEME.accent },
+  itemNotes: { fontSize: 13, color: WARM_THEME.textSecondary, lineHeight: 18 },
   cardFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 4,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
+    borderTopColor: WARM_THEME.border,
   },
-  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locText: { fontSize: 12, fontWeight: '600', color: '#334155' },
+  locRow: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 4 },
+  locText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
   claimBtn: {
-    backgroundColor: '#15803d',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 10,
   },
-  claimedBtn: { backgroundColor: '#e2e8f0' },
-  claimBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
-  claimedBtnText: { color: '#475569' },
+  claimedBtn: { backgroundColor: WARM_THEME.surfaceMuted },
+  claimBtnText: { color: WARM_THEME.accentText, fontSize: 12, fontWeight: '700' },
+  claimedBtnText: { color: WARM_THEME.textSecondary },
   modalBg: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     padding: 20,
   },
-  modalCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 20, gap: 10 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#14532d', marginBottom: 2 },
-  toggleRow: { flexDirection: 'row', gap: 8 },
+  modalCard: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 20,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary, marginBottom: 2 },
+  toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   togglePill: {
     flex: 1,
+    minWidth: 125,
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
     alignItems: 'center',
   },
-  togglePillActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
-  togglePillText: { fontSize: 13, fontWeight: '700', color: '#334155' },
-  togglePillTextActive: { color: '#ffffff' },
+  togglePillActive: { backgroundColor: WARM_THEME.accent, borderColor: WARM_THEME.accent },
+  togglePillText: { fontSize: 13, fontWeight: '700', color: WARM_THEME.textSecondary },
+  togglePillTextActive: { color: WARM_THEME.accentText },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+    color: WARM_THEME.textPrimary,
+    backgroundColor: WARM_THEME.surface,
   },
   modalActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 10,
     marginTop: 6,
   },
   cancelBtn: { paddingHorizontal: 14, paddingVertical: 10 },
-  cancelText: { color: '#475569', fontWeight: '700' },
+  cancelText: { color: WARM_THEME.textSecondary, fontWeight: '700' },
   saveBtn: {
-    backgroundColor: '#15803d',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
   },
-  saveText: { color: '#ffffff', fontWeight: '800' },
+  saveText: { color: WARM_THEME.accentText, fontWeight: '800' },
 });

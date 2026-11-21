@@ -3,8 +3,11 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share } from 'react-native';
 import { AdminConsoleScreen } from '../../components/AdminConsoleScreen';
+import { WarmBannerCard } from '../../components/WarmBannerCard';
 import { useGarden } from '../../context/GardenContext';
 import { useAdminAccess } from '../../utils/adminAccess';
+import { WARM_THEME } from '../../utils/warmTheme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface WeatherData {
   currentTemp: number;
@@ -737,27 +740,28 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <View style={styles.heroTop}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 170 }}>
             <Text style={styles.heroTag}>WESTERN SYDNEY • LIVE</Text>
             <Text style={styles.heroTitle}>ADHD Chaos Gardening</Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
             <TouchableOpacity onPress={() => setModal('auth')} style={styles.cloudBtn}>
-              <Ionicons name={user ? 'cloud-done' : 'cloud-outline'} size={16} color="#dcfce7" />
+              <Ionicons name={user ? 'cloud-done' : 'cloud-outline'} size={16} color={WARM_THEME.accent} />
               <Text style={styles.cloudTxt}>{syncLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn}>
-              <Ionicons name="refresh" size={16} color="#dcfce7" />
+              <Ionicons name="refresh" size={16} color={WARM_THEME.accent} />
             </TouchableOpacity>
           </View>
         </View>
 
         {loadingWeather && !weather ? (
           <View style={styles.weatherLoading}>
-            <ActivityIndicator color="#86efac" size="small" />
+            <ActivityIndicator color={WARM_THEME.accentWarm} size="small" />
             <Text style={styles.heroSub}>Checking Western Sydney forecast...</Text>
           </View>
         ) : weather && wInfo ? (
@@ -777,14 +781,22 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         )}
       </View>
 
+      <WarmBannerCard
+        title="A calmer garden day"
+        subtitle="Your plants, harvests, and small wins—all in one place."
+        imageSource={require('../../../assets/images/icon.png')}
+        imageAlt="App icon"
+        badgeText="Garden"
+      />
+
       <View style={styles.focusCard}>
         <View style={styles.focusHeader}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 150 }}>
             <Text style={styles.focusTag}>NO OVERWHELM • MAX 3</Text>
             <Text style={styles.focusTitle}>🎯 Top-3 Today</Text>
           </View>
           <TouchableOpacity style={styles.resetBtn} onPress={handleCatchUpReset}>
-            <Ionicons name="sparkles-outline" size={14} color="#14532d" />
+            <Ionicons name="sparkles-outline" size={14} color={WARM_THEME.accent} />
             <Text style={styles.resetBtnText}>Catch-Up Reset</Text>
           </TouchableOpacity>
         </View>
@@ -805,7 +817,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
                 <Text style={styles.focusItemText}>{item.label}</Text>
                 <Text style={styles.focusMeta}>{item.meta}</Text>
               </View>
-              <Ionicons name="checkmark-circle-outline" size={22} color="#15803d" />
+              <Ionicons name="checkmark-circle-outline" size={22} color={WARM_THEME.accent} />
             </TouchableOpacity>
           ))
         )}
@@ -858,19 +870,19 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
 
       <View style={styles.actionRow}>
         <TouchableOpacity style={styles.actionBtn} onPress={() => { waterAll(); Alert.alert('Watered!', 'All plants logged as watered today.'); }}>
-          <Ionicons name="water" size={20} color="#0284c7" />
+          <Ionicons name="water" size={20} color={WARM_THEME.accentWarm} />
           <Text style={styles.actionLabel}>Water All</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={() => { feedAll(); Alert.alert('Fed!', 'All active plants logged as fed today.'); }}>
-          <Ionicons name="leaf" size={20} color="#15803d" />
+          <Ionicons name="leaf" size={20} color={WARM_THEME.accent} />
           <Text style={styles.actionLabel}>Bulk Feed</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('harvest')}>
-          <Ionicons name="basket" size={20} color="#d97706" />
+          <Ionicons name="basket" size={20} color={WARM_THEME.accentWarm} />
           <Text style={styles.actionLabel}>Log Yield</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('expense')}>
-          <Ionicons name="cash" size={20} color="#7c3aed" />
+          <Ionicons name="cash" size={20} color={WARM_THEME.accent} />
           <Text style={styles.actionLabel}>Expense</Text>
         </TouchableOpacity>
       </View>
@@ -893,7 +905,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         <View style={styles.card}><Text style={styles.statNum}>{uniqueVarieties}</Text><Text style={styles.statLabel}>Varieties</Text></View>
         <View style={styles.card}><Text style={styles.statNum}>{totalGrams >= 1000 ? `${(totalGrams / 1000).toFixed(2)}kg` : `${totalGrams}g`}</Text><Text style={styles.statLabel}>Total Harvest</Text></View>
         <View style={styles.card}>
-          <Text style={[styles.statNum, { color: netSaved >= 0 ? '#15803d' : '#dc2626' }]}>
+          <Text style={[styles.statNum, { color: netSaved >= 0 ? WARM_THEME.accentWarm : WARM_THEME.danger }]}>
             {netSaved >= 0 ? `$${netSaved.toFixed(2)}` : `-$${Math.abs(netSaved).toFixed(2)}`}
           </Text>
           <Text style={styles.statLabel}>Net Saved (AUD)</Text>
@@ -902,7 +914,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
 
       {plants.length === 0 && (
         <TouchableOpacity style={styles.starterBtn} onPress={loadSampleGarden}>
-          <Ionicons name="sparkles" size={18} color="#ffffff" />
+          <Ionicons name="sparkles" size={18} color={WARM_THEME.accentText} />
           <Text style={styles.starterText}>Load Western Sydney Starter Garden</Text>
         </TouchableOpacity>
       )}
@@ -914,7 +926,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           accessibilityRole="button"
           accessibilityLabel="Open Admin console"
         >
-          <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '600' }}>Open Admin</Text>
+          <Text style={{ color: WARM_THEME.textSecondary, fontSize: 11, fontWeight: '600' }}>Open Admin</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity
@@ -923,7 +935,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           accessibilityRole="button"
           accessibilityLabel="Unlock Admin console"
         >
-          <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '600' }}>Admin</Text>
+          <Text style={{ color: WARM_THEME.textSecondary, fontSize: 11, fontWeight: '600' }}>Admin</Text>
         </TouchableOpacity>
       )}
 
@@ -938,7 +950,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
                   <Text style={styles.alertBody}>Status: {syncLabel}</Text>
                   <View style={styles.modalRow}>
                     <TouchableOpacity style={styles.cancelBtn} onPress={() => setModal('none')}><Text>Close</Text></TouchableOpacity>
-                    <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#dc2626' }]} onPress={async () => { await signOut(); setModal('none'); }}>
+                    <TouchableOpacity style={[styles.saveBtn, { backgroundColor: WARM_THEME.danger }]} onPress={async () => { await signOut(); setModal('none'); }}>
                       <Text style={styles.saveText}>Sign Out</Text>
                     </TouchableOpacity>
                   </View>
@@ -964,9 +976,9 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
               <>
                 <Text style={styles.modalTitle}>Log Harvest Yield</Text>
                 <TextInput placeholder="Crop name (e.g. Tommy Toe Tomato)" value={crop} onChangeText={setCrop} style={styles.input} />
-<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6, marginBottom: 4 }}>{HARVEST_PLANT_CHIPS.map(label => (<TouchableOpacity key={label} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 6, backgroundColor: crop === label ? "#15803d" : "#f0fdf4", borderWidth: 1, borderColor: crop === label ? "#15803d" : "#bbf7d0" }} onPress={() => setCrop(label)}><Text style={{ fontSize: 12, fontWeight: "800", color: crop === label ? "#ffffff" : "#14532d" }}>{label}</Text></TouchableOpacity>))}</ScrollView>
+<ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6, marginBottom: 4 }}>{HARVEST_PLANT_CHIPS.map(label => (<TouchableOpacity key={label} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 6, backgroundColor: crop === label ? WARM_THEME.accent : WARM_THEME.surfaceMuted, borderWidth: 1, borderColor: crop === label ? WARM_THEME.accent : WARM_THEME.border }} onPress={() => setCrop(label)}><Text style={{ fontSize: 12, fontWeight: "800", color: crop === label ? WARM_THEME.accentText : WARM_THEME.textPrimary }}>{label}</Text></TouchableOpacity>))}</ScrollView>
                 <TextInput placeholder="Weight in grams (e.g. 500)" value={grams} onChangeText={setGrams} keyboardType="numeric" style={styles.input} />
-<View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 4 }}>{QUICK_HARVEST_WEIGHTS.map(w => (<TouchableOpacity key={w.label} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: grams === String(w.grams) ? "#15803d" : "#f0fdf4", borderWidth: 1, borderColor: grams === String(w.grams) ? "#15803d" : "#bbf7d0" }} onPress={() => setGrams(String(w.grams))}><Text style={{ fontSize: 12, fontWeight: "800", color: grams === String(w.grams) ? "#ffffff" : "#14532d" }}>{w.label}</Text></TouchableOpacity>))}</View>
+<View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 4 }}>{QUICK_HARVEST_WEIGHTS.map(w => (<TouchableOpacity key={w.label} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: grams === String(w.grams) ? WARM_THEME.accent : WARM_THEME.surfaceMuted, borderWidth: 1, borderColor: grams === String(w.grams) ? WARM_THEME.accent : WARM_THEME.border }} onPress={() => setGrams(String(w.grams))}><Text style={{ fontSize: 12, fontWeight: "800", color: grams === String(w.grams) ? WARM_THEME.accentText : WARM_THEME.textPrimary }}>{w.label}</Text></TouchableOpacity>))}</View>
                 <View style={styles.modalRow}>
                   <TouchableOpacity style={styles.cancelBtn} onPress={() => setModal('none')}><Text>Cancel</Text></TouchableOpacity>
                   <TouchableOpacity style={styles.saveBtn} onPress={saveHarvest}><Text style={styles.saveText}>Save Harvest</Text></TouchableOpacity>
@@ -1028,7 +1040,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           animationType="slide"
           onRequestClose={() => setShowAdminModal(false)}
         >
-          <View style={{ flex: 1, backgroundColor: '#f0fdf4' }}>
+          <View style={{ flex: 1, backgroundColor: WARM_THEME.background }}>
             <AdminConsoleScreen
               isAdmin={isAdmin}
               onUnlock={verifyAdminPasscode}
@@ -1038,74 +1050,254 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           </View>
         </Modal>
       )}
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0fdf4' },
-  content: { padding: 16, gap: 14, paddingBottom: 32 },
-  hero: { backgroundColor: '#14532d', borderRadius: 20, padding: 18 },
-  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  heroTag: { color: '#86efac', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
-  heroTitle: { color: '#ffffff', fontSize: 21, fontWeight: '800', marginTop: 3 },
-  heroSub: { color: '#dcfce7', fontSize: 13, marginTop: 8 },
-  cloudBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  cloudTxt: { color: '#dcfce7', fontSize: 11, fontWeight: '700' },
-  refreshBtn: { backgroundColor: 'rgba(255,255,255,0.14)', padding: 7, borderRadius: 10 },
-  weatherLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
-  weatherBox: { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 14, padding: 12 },
-  weatherMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  tempNow: { color: '#ffffff', fontSize: 28, fontWeight: '800' },
-  weatherLabel: { color: '#bbf7d0', fontSize: 13, fontWeight: '700' },
-  weatherSub: { color: '#dcfce7', fontSize: 12, marginTop: 2 },
-  updatedTxt: { color: '#86efac', fontSize: 10, marginTop: 6, textAlign: 'right' },
-  focusCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#bbf7d0', gap: 10 },
-  focusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  focusTag: { fontSize: 10, fontWeight: '800', color: '#15803d', letterSpacing: 0.8 },
-  focusTitle: { fontSize: 18, fontWeight: '800', color: '#14532d', marginTop: 2 },
-  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  resetBtnText: { fontSize: 12, fontWeight: '700', color: '#14532d' },
-  focusHint: { fontSize: 12, color: '#475569', lineHeight: 17 },
-  emptyFocus: { fontSize: 13, color: '#64748b', fontStyle: 'italic' },
-  focusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', padding: 11, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  focusNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#15803d', alignItems: 'center', justifyContent: 'center' },
-  focusNumText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
-  focusItemText: { fontSize: 13, fontWeight: '700', color: '#0f172a' },
-  focusMeta: { fontSize: 11, color: '#64748b', marginTop: 2 },
-  pantryCard: { backgroundColor: '#ecfdf5', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#6ee7b7', gap: 6 },
-  pantryTitle: { fontSize: 13, fontWeight: '800', color: '#065f46' },
-  pantryLine: { fontSize: 12, color: '#064e3b', lineHeight: 17 },
-  seedAlertCard: { backgroundColor: '#fffbeb', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#fcd34d', gap: 5 },
-  seedAlertTitle: { fontSize: 13, fontWeight: '800', color: '#92400e' },
-  seedAlertLine: { fontSize: 12, color: '#78350f', lineHeight: 17 },
-  alertCard: { borderRadius: 14, padding: 14, borderWidth: 1 },
-  alertHeat: { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
-  alertWarm: { backgroundColor: '#fef3c7', borderColor: '#fcd34d' },
-  alertFrost: { backgroundColor: '#e0f2fe', borderColor: '#7dd3fc' },
-  alertRain: { backgroundColor: '#eff6ff', borderColor: '#93c5fd' },
-  alertTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a' },
-  alertBody: { fontSize: 12, color: '#334155', marginTop: 4, lineHeight: 17 },
-  actionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
-  actionBtn: { flex: 1, backgroundColor: '#ffffff', borderRadius: 14, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#dcfce7', gap: 4 },
-  actionLabel: { fontSize: 11, fontWeight: '700', color: '#1e293b' },
-  harvestBanner: { backgroundColor: '#fef3c7', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#fde68a' },
-  bannerTitle: { fontSize: 12, fontWeight: '800', color: '#92400e' },
-  pickChip: { backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#fcd34d' },
-  pickChipText: { fontSize: 13, fontWeight: '700', color: '#78350f' },
+  safeArea: { flex: 1, backgroundColor: WARM_THEME.background },
+  container: { flex: 1, backgroundColor: WARM_THEME.background },
+  content: {
+    padding: WARM_THEME.spacingScreen,
+    gap: WARM_THEME.spacingScreen,
+    paddingBottom: 32,
+  },
+  hero: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    gap: 12,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  heroTag: { color: WARM_THEME.accentWarm, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  heroTitle: { color: WARM_THEME.textPrimary, fontSize: 21, fontWeight: '800', marginTop: 3 },
+  heroSub: { color: WARM_THEME.textSecondary, fontSize: 13, marginTop: 8 },
+  cloudBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: WARM_THEME.accentSoft,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  cloudTxt: { color: WARM_THEME.textPrimary, fontSize: 11, fontWeight: '700' },
+  refreshBtn: {
+    backgroundColor: WARM_THEME.surfaceMuted,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    padding: 7,
+    borderRadius: 10,
+  },
+  weatherLoading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 10 },
+  weatherBox: {
+    marginTop: 12,
+    backgroundColor: WARM_THEME.surfaceMuted,
+    borderColor: WARM_THEME.border,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+  },
+  weatherMain: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
+  tempNow: { color: WARM_THEME.textPrimary, fontSize: 28, fontWeight: '800' },
+  weatherLabel: { color: WARM_THEME.accentWarm, fontSize: 13, fontWeight: '700' },
+  weatherSub: { color: WARM_THEME.textSecondary, fontSize: 12, marginTop: 2 },
+  updatedTxt: { color: WARM_THEME.textSecondary, fontSize: 10, marginTop: 6, textAlign: 'right' },
+  focusCard: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    gap: 10,
+  },
+  focusHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  focusTag: { fontSize: 10, fontWeight: '800', color: WARM_THEME.accent, letterSpacing: 0.8 },
+  focusTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary, marginTop: 2 },
+  resetBtn: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: WARM_THEME.accentSoft,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  resetBtnText: { fontSize: 12, fontWeight: '700', color: WARM_THEME.accent },
+  focusHint: { fontSize: 12, color: WARM_THEME.textSecondary, lineHeight: 17 },
+  emptyFocus: { fontSize: 13, color: WARM_THEME.textSecondary, fontStyle: 'italic' },
+  focusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: WARM_THEME.surfaceMuted,
+    padding: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  focusNum: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: WARM_THEME.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  focusNumText: { color: WARM_THEME.accentText, fontSize: 12, fontWeight: '800' },
+  focusItemText: { fontSize: 13, fontWeight: '700', color: WARM_THEME.textPrimary },
+  focusMeta: { fontSize: 11, color: WARM_THEME.textSecondary, marginTop: 2 },
+  pantryCard: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    gap: 6,
+  },
+  pantryTitle: { fontSize: 13, fontWeight: '800', color: WARM_THEME.accentWarm },
+  pantryLine: { fontSize: 12, color: WARM_THEME.textPrimary, lineHeight: 17 },
+  seedAlertCard: {
+    backgroundColor: WARM_THEME.accentSoft,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: WARM_THEME.accentWarm,
+    gap: 5,
+  },
+  seedAlertTitle: { fontSize: 13, fontWeight: '800', color: WARM_THEME.accentWarm },
+  seedAlertLine: { fontSize: 12, color: WARM_THEME.textPrimary, lineHeight: 17 },
+  alertCard: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  alertHeat: { backgroundColor: WARM_THEME.accentSoft, borderColor: WARM_THEME.accentWarm },
+  alertWarm: { backgroundColor: WARM_THEME.surfaceMuted, borderColor: WARM_THEME.accentWarm },
+  alertFrost: { backgroundColor: WARM_THEME.surfaceMuted, borderColor: WARM_THEME.border },
+  alertRain: { backgroundColor: WARM_THEME.surfaceMuted, borderColor: WARM_THEME.border },
+  alertTitle: { fontSize: 13, fontWeight: '800', color: WARM_THEME.textPrimary },
+  alertBody: { fontSize: 12, color: WARM_THEME.textSecondary, marginTop: 4, lineHeight: 17 },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  actionBtn: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 128,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: 14,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    gap: 4,
+  },
+  actionLabel: { fontSize: 11, fontWeight: '700', color: WARM_THEME.textPrimary },
+  harvestBanner: {
+    backgroundColor: WARM_THEME.accentSoft,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: WARM_THEME.accentWarm,
+  },
+  bannerTitle: { fontSize: 12, fontWeight: '800', color: WARM_THEME.accentWarm },
+  pickChip: {
+    backgroundColor: WARM_THEME.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  pickChipText: { fontSize: 13, fontWeight: '700', color: WARM_THEME.textPrimary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  card: { width: '48%', backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#dcfce7' },
-  statNum: { fontSize: 24, fontWeight: '800', color: '#15803d' },
-  statLabel: { fontSize: 13, color: '#475569', marginTop: 4 },
-  starterBtn: { backgroundColor: '#15803d', borderRadius: 14, padding: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  starterText: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 20, gap: 12 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#14532d' },
-  input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, fontSize: 15 },
-  switchAuth: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center', marginTop: 2 },
-  modalRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
-  cancelBtn: { paddingHorizontal: 16, paddingVertical: 10 },
-  saveBtn: { backgroundColor: '#15803d', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
-  saveText: { color: '#ffffff', fontWeight: '700' },
+  card: {
+    flexGrow: 1,
+    flexBasis: '45%',
+    minWidth: 130,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  statNum: { fontSize: 24, fontWeight: '800', color: WARM_THEME.accent },
+  statLabel: { fontSize: 13, color: WARM_THEME.textSecondary, marginTop: 4 },
+  starterBtn: {
+    backgroundColor: WARM_THEME.accent,
+    borderRadius: 14,
+    padding: 15,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  starterText: { color: WARM_THEME.accentText, fontWeight: '800', fontSize: 15 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(38,30,26,0.45)', justifyContent: 'center', padding: 20 },
+  modalCard: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+    backgroundColor: WARM_THEME.surface,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 20,
+    gap: 12,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary },
+  input: {
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 15,
+    color: WARM_THEME.textPrimary,
+    backgroundColor: WARM_THEME.background,
+  },
+  switchAuth: { color: WARM_THEME.accent, fontWeight: '700', fontSize: 13, textAlign: 'center', marginTop: 2 },
+  modalRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 6,
+  },
+  cancelBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: WARM_THEME.surfaceMuted,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  saveBtn: { backgroundColor: WARM_THEME.accent, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  saveText: { color: WARM_THEME.accentText, fontWeight: '700' },
 });

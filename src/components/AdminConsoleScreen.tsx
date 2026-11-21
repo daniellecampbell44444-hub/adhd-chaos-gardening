@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
   View,
   Text,
   TextInput,
@@ -7,8 +8,19 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WarmBannerCard } from "./WarmBannerCard";
 import { WARM_THEME } from "../utils/warmTheme";
+import {
+  APP_COLOR_PRESETS,
+  DEFAULT_ADMIN_VISUALS,
+  getActivePalette,
+  isValidHexColor,
+  loadAdminVisuals,
+  saveAdminVisuals,
+} from "../utils/adminCustomization";
+import type { AdminVisualSettings } from "../utils/adminCustomization";
 
 export interface AdminStagedItem {
   id: string;
@@ -25,6 +37,7 @@ interface AdminConsoleScreenProps {
   isProPreview?: boolean;
   onToggleProPreview?: (enabled: boolean) => void;
   onStageItem?: (item: AdminStagedItem) => void;
+  onVisualsChange?: (settings: AdminVisualSettings) => void;
 }
 
 export function AdminConsoleScreen({
@@ -35,6 +48,7 @@ export function AdminConsoleScreen({
   isProPreview = false,
   onToggleProPreview,
   onStageItem,
+  onVisualsChange,
 }: AdminConsoleScreenProps) {
   const [passcodeInput, setPasscodeInput] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -44,6 +58,24 @@ export function AdminConsoleScreen({
   const [itemKind, setItemKind] = useState<"Seed" | "Plant" | "Garden Item">("Seed");
   const [seedPostage, setSeedPostage] = useState(true);
   const [stagedItems, setStagedItems] = useState<AdminStagedItem[]>([]);
+  const [visualSettings, setVisualSettings] =
+    useState<AdminVisualSettings>(DEFAULT_ADMIN_VISUALS);
+  const [savingVisualSettings, setSavingVisualSettings] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    let active = true;
+    loadAdminVisuals().then((settings) => {
+      if (!active) return;
+      setVisualSettings(settings);
+      onVisualsChange?.(settings);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isAdmin, onVisualsChange]);
 
   const handleUnlockPress = () => {
     const ok = onUnlock(passcodeInput);
@@ -58,7 +90,7 @@ export function AdminConsoleScreen({
   // Hard guard: never render admin tools unless isAdmin is true
   if (!isAdmin) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.safeArea}>
         <View style={styles.lockedContainer}>
           <Text style={styles.lockedTitle}>Restricted Admin Area</Text>
           <Text style={styles.lockedSubtitle}>
@@ -92,6 +124,83 @@ export function AdminConsoleScreen({
   }
 
   const effectivePostageAllowed = itemKind === "Seed" && seedPostage;
+  const activePalette = getActivePalette(visualSettings);
+  const customAccentIsValid = isValidHexColor(visualSettings.customAccentHex);
+
+  const persistVisualSettings = async (settings: AdminVisualSettings) => {
+    const settingsToSave = {
+      ...settings,
+      customAccentHex: settings.customAccentHex.trim().toUpperCase(),
+    };
+
+    setSavingVisualSettings(true);
+    try {
+      await saveAdminVisuals(settingsToSave);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatusMessage(`Could not save visual settings: ${message}`);
+      return false;
+    } finally {
+      setSavingVisualSettings(false);
+    }
+
+    setVisualSettings(settingsToSave);
+    onVisualsChange?.(settingsToSave);
+    return true;
+  };
+
+  const handleSaveVisualSettings = async () => {
+    if (!customAccentIsValid) {
+      setStatusMessage("Enter a valid 6-digit accent hex code, such as #B85D3B.");
+      return;
+    }
+
+    const saved = await persistVisualSettings(visualSettings);
+    if (!saved) return;
+    setStatusMessage("Visual settings saved.");
+  };
+
+  const handlePickImage = async (
+    settingKey: "bannerImageUri" | "homeCardImageUri"
+  ) => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(
+          "Photo library permission required",
+          "Allow photo library access to choose an app image."
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.85,
+      });
+
+      if (result.canceled) return;
+      const uri = result.assets[0]?.uri;
+      if (!uri) {
+        setStatusMessage("The selected photo did not include an image URI.");
+        return;
+      }
+
+      const nextSettings = { ...visualSettings, [settingKey]: uri };
+      setVisualSettings(nextSettings);
+      const saved = await persistVisualSettings(nextSettings);
+      if (saved) {
+        setStatusMessage(
+          settingKey === "bannerImageUri"
+            ? "Banner image selected and saved."
+            : "Home card image selected and saved."
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setStatusMessage(`Could not select an image: ${message}`);
+    }
+  };
 
   const handleAddStagedItem = () => {
     const trimmed = itemName.trim();
@@ -116,7 +225,7 @@ export function AdminConsoleScreen({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
@@ -130,6 +239,18 @@ export function AdminConsoleScreen({
             <Text style={styles.lockBtnText}>Lock Admin</Text>
           </TouchableOpacity>
         </View>
+
+        <WarmBannerCard
+          title="Garden Admin Tools"
+          subtitle="Manage catalog entries, swap policy, and app controls."
+          imageSource={
+            visualSettings.bannerImageUri.trim()
+              ? { uri: visualSettings.bannerImageUri.trim() }
+              : require("../../assets/images/icon.png")
+          }
+          imageAlt="App icon"
+          badgeText="Admin"
+        />
 
         <View style={styles.tabWrapRow}>
           {(["catalog", "swap", "app"] as const).map((tab) => {
@@ -231,29 +352,193 @@ export function AdminConsoleScreen({
         )}
 
         {activeTab === "app" && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Subscription & App Controls</Text>
-            <Text style={styles.bodyText}>
-              Dev Pro Preview status: {isProPreview ? "ACTIVE" : "FREE TIER"}
-            </Text>
-            {onToggleProPreview && (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Subscription & App Controls</Text>
+              <Text style={styles.bodyText}>
+                Dev Pro Preview status: {isProPreview ? "ACTIVE" : "FREE TIER"}
+              </Text>
+              {onToggleProPreview && (
+                <TouchableOpacity
+                  style={styles.primaryBtn}
+                  onPress={() => {
+                    const next = !isProPreview;
+                    onToggleProPreview(next);
+                    setStatusMessage(`Dev Pro Preview set to ${next ? "ON" : "OFF"}`);
+                  }}
+                >
+                  <Text style={styles.primaryBtnText}>
+                    {isProPreview ? "Switch to Free Preview" : "Switch to Pro Preview"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <Text style={styles.helperText}>
+                Keep real billing entitlements and admin roles verified on your backend/Google Play before public release.
+              </Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>App Visual Settings</Text>
+              <Text style={styles.helperText}>
+                Choose a warm palette, set a custom accent, and provide optional banner or home card image URLs/URIs.
+              </Text>
+
+              <View style={styles.wrapRow}>
+                {Object.values(APP_COLOR_PRESETS).map((preset) => {
+                  const selected = visualSettings.presetId === preset.id;
+                  return (
+                    <TouchableOpacity
+                      key={preset.id}
+                      style={[
+                        styles.visualPreset,
+                        selected && styles.visualPresetSelected,
+                      ]}
+                      onPress={() =>
+                        setVisualSettings((current) => ({
+                          ...current,
+                          presetId: preset.id,
+                          customAccentHex: preset.accent,
+                        }))
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.visualSwatch,
+                          { backgroundColor: preset.accent },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.visualPresetText,
+                          selected && styles.visualPresetTextSelected,
+                        ]}
+                      >
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={styles.visualLabelRow}>
+                <Text style={styles.fieldLabel}>Custom Accent (#RRGGBB)</Text>
+                <View
+                  style={[
+                    styles.accentPreview,
+                    { backgroundColor: activePalette.accent },
+                  ]}
+                />
+              </View>
+              <TextInput
+                value={visualSettings.customAccentHex}
+                onChangeText={(value) =>
+                  setVisualSettings((current) => ({
+                    ...current,
+                    customAccentHex: value,
+                  }))
+                }
+                placeholder="#B85D3B"
+                placeholderTextColor={WARM_THEME.textSecondary}
+                autoCapitalize="characters"
+                maxLength={7}
+                style={styles.input}
+              />
+              {!customAccentIsValid && (
+                <Text style={styles.validationText}>
+                  Enter a # followed by exactly six hexadecimal digits.
+                </Text>
+              )}
+
+              <Text style={styles.fieldLabel}>Top Banner Image URL or URI</Text>
+              <TextInput
+                value={visualSettings.bannerImageUri}
+                onChangeText={(value) =>
+                  setVisualSettings((current) => ({
+                    ...current,
+                    bannerImageUri: value,
+                  }))
+                }
+                placeholder="https://... or file://..."
+                placeholderTextColor={WARM_THEME.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                style={styles.input}
+              />
+              <View style={styles.wrapRow}>
+                <TouchableOpacity
+                  style={styles.primaryBtn}
+                  onPress={() => void handlePickImage("bannerImageUri")}
+                  disabled={savingVisualSettings}
+                >
+                  <Text style={styles.primaryBtnText}>Pick from Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() =>
+                    setVisualSettings((current) => ({
+                      ...current,
+                      bannerImageUri: "",
+                    }))
+                  }
+                  disabled={savingVisualSettings}
+                >
+                  <Text style={styles.secondaryBtnText}>Clear Banner Image</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.fieldLabel}>Home Card Image URL or URI</Text>
+              <TextInput
+                value={visualSettings.homeCardImageUri}
+                onChangeText={(value) =>
+                  setVisualSettings((current) => ({
+                    ...current,
+                    homeCardImageUri: value,
+                  }))
+                }
+                placeholder="https://... or file://..."
+                placeholderTextColor={WARM_THEME.textSecondary}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                style={styles.input}
+              />
+              <View style={styles.wrapRow}>
+                <TouchableOpacity
+                  style={styles.primaryBtn}
+                  onPress={() => void handlePickImage("homeCardImageUri")}
+                  disabled={savingVisualSettings}
+                >
+                  <Text style={styles.primaryBtnText}>Pick from Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() =>
+                    setVisualSettings((current) => ({
+                      ...current,
+                      homeCardImageUri: "",
+                    }))
+                  }
+                  disabled={savingVisualSettings}
+                >
+                  <Text style={styles.secondaryBtnText}>Clear Home Card Image</Text>
+                </TouchableOpacity>
+              </View>
+
               <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={() => {
-                  const next = !isProPreview;
-                  onToggleProPreview(next);
-                  setStatusMessage(`Dev Pro Preview set to ${next ? "ON" : "OFF"}`);
-                }}
+                style={[
+                  styles.primaryBtn,
+                  savingVisualSettings && styles.disabledButton,
+                ]}
+                onPress={handleSaveVisualSettings}
+                disabled={savingVisualSettings}
               >
                 <Text style={styles.primaryBtnText}>
-                  {isProPreview ? "Switch to Free Preview" : "Switch to Pro Preview"}
+                  {savingVisualSettings ? "Saving..." : "Save Visual Settings"}
                 </Text>
               </TouchableOpacity>
-            )}
-            <Text style={styles.helperText}>
-              Keep real billing entitlements and admin roles verified on your backend/Google Play before public release.
-            </Text>
-          </View>
+            </View>
+          </>
         )}
 
         {statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
@@ -274,10 +559,10 @@ const styles = StyleSheet.create({
     backgroundColor: WARM_THEME.background,
   },
   lockedContainer: {
-    margin: 16,
+    margin: WARM_THEME.spacingScreen,
     padding: 20,
     gap: 12,
-    borderRadius: 16,
+    borderRadius: WARM_THEME.radiusCard,
     backgroundColor: WARM_THEME.surface,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
@@ -293,9 +578,9 @@ const styles = StyleSheet.create({
     color: WARM_THEME.textSecondary,
   },
   container: {
-    padding: 16,
-    paddingBottom: 28,
-    gap: 14,
+    padding: WARM_THEME.spacingScreen,
+    paddingBottom: WARM_THEME.spacingScreen + 12,
+    gap: WARM_THEME.spacingScreen,
   },
   headerRow: {
     flexDirection: "row",
@@ -306,7 +591,7 @@ const styles = StyleSheet.create({
   },
   headerTextGroup: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 0,
     gap: 2,
   },
   title: {
@@ -348,7 +633,7 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: 14,
-    borderRadius: 16,
+    borderRadius: WARM_THEME.radiusCard,
     backgroundColor: WARM_THEME.surface,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
@@ -368,6 +653,70 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     color: WARM_THEME.textSecondary,
+  },
+  fieldLabel: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: "700",
+    color: WARM_THEME.textSecondary,
+  },
+  visualPreset: {
+    flexGrow: 1,
+    minWidth: 125,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    backgroundColor: WARM_THEME.surfaceMuted,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  visualPresetSelected: {
+    backgroundColor: WARM_THEME.accentSoft,
+    borderColor: WARM_THEME.accent,
+  },
+  visualSwatch: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  visualPresetText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: "700",
+    color: WARM_THEME.textSecondary,
+  },
+  visualPresetTextSelected: {
+    color: WARM_THEME.accent,
+  },
+  visualLabelRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  accentPreview: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  validationText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: WARM_THEME.danger,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   input: {
     width: "100%",
@@ -389,7 +738,7 @@ const styles = StyleSheet.create({
   pill: {
     paddingVertical: 7,
     paddingHorizontal: 12,
-    borderRadius: 999,
+    borderRadius: WARM_THEME.radiusPill,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     backgroundColor: WARM_THEME.surfaceMuted,
@@ -412,12 +761,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: WARM_THEME.accentSoft,
     borderWidth: 1,
-    borderColor: WARM_THEME.border,
+    borderColor: WARM_THEME.accentWarm,
   },
   toggleLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: WARM_THEME.accent,
+    color: WARM_THEME.accentWarm,
   },
   primaryBtn: {
     backgroundColor: WARM_THEME.accent,
@@ -446,7 +795,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   lockBtn: {
-    backgroundColor: WARM_THEME.danger,
+    backgroundColor: WARM_THEME.accent,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 10,

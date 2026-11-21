@@ -9,7 +9,9 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { WARM_THEME } from '../../utils/warmTheme';
 import {
   useGarden,
   PLANT_LIBRARY,
@@ -110,7 +112,7 @@ export default function PlantsScreen() {
     return (
       <View key={p.id} style={styles.plantCard}>
         <View style={styles.cardTop}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.plantTitle}>
               {p.variety} {p.name}
             </Text>
@@ -135,21 +137,21 @@ export default function PlantsScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.carePill} onPress={() => waterPlant(p.id)}>
-            <Ionicons name="water" size={14} color="#0284c7" />
+            <Ionicons name="water" size={14} color={WARM_THEME.accent} />
             <Text style={styles.carePillText}>
               {p.lastWatered ? `Watered ${p.lastWatered}` : 'Water'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.feedPill} onPress={() => feedPlant(p.id)}>
-            <Ionicons name="leaf" size={14} color="#15803d" />
+            <Ionicons name="leaf" size={14} color={WARM_THEME.accentWarm} />
             <Text style={styles.feedPillText}>
               {p.lastFed ? `Fed ${p.lastFed}` : 'Feed'}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => deletePlant(p.id)} style={{ marginLeft: 'auto' }}>
-            <Ionicons name="trash-outline" size={18} color="#94a3b8" />
+            <Ionicons name="trash-outline" size={18} color={WARM_THEME.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -157,9 +159,9 @@ export default function PlantsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.safeArea}><ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.tag}>MY GARDEN STASH</Text>
           <Text style={styles.title}>Plants & Zones</Text>
         </View>
@@ -173,13 +175,13 @@ export default function PlantsScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.addBtn} onPress={() => setModalVisible(true)}>
-            <Ionicons name="add" size={20} color="#ffffff" />
+            <Ionicons name="add" size={20} color={WARM_THEME.accentText} />
             <Text style={styles.addBtnText}>Add</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+      <View style={styles.wrapRow}>
         {SITES.map(s => {
           const active = selectedSite === s;
           return (
@@ -194,7 +196,7 @@ export default function PlantsScreen() {
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </View>
 
       {filtered.length === 0 ? (
         <View style={styles.emptyBox}>
@@ -229,7 +231,7 @@ export default function PlantsScreen() {
               <Text style={styles.modalTitle}>Add Plant</Text>
 
               <Text style={styles.fieldLabel}>Quick Pick from Library</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.wrapRow}>
                 {PLANT_LIBRARY.slice(0, 12).map(item => (
                   <TouchableOpacity
                     key={item.id}
@@ -246,12 +248,12 @@ export default function PlantsScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </ScrollView>
+              </View>
 
               {plants.length > 0 && (
                 <>
                   <Text style={styles.fieldLabel}>Match Spot & Pot From Existing Plants</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={styles.wrapRow}>
                     {plants.slice(0, 8).map(existing => (
                       <TouchableOpacity
                         key={existing.id}
@@ -268,7 +270,7 @@ export default function PlantsScreen() {
                         </Text>
                       </TouchableOpacity>
                     ))}
-                  </ScrollView>
+                  </View>
                 </>
               )}
 
@@ -369,7 +371,7 @@ export default function PlantsScreen() {
               </View>
 
               <View style={styles.twoCol}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 130 }}>
                   <Text style={styles.fieldLabel}>Quantity</Text>
                   <TextInput
                     value={quantityText}
@@ -378,7 +380,7 @@ export default function PlantsScreen() {
                     style={styles.input}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, minWidth: 130 }}>
                   <Text style={styles.fieldLabel}>Water Every (Days)</Text>
                   <TextInput
                     value={waterEveryDaysText}
@@ -424,86 +426,99 @@ export default function PlantsScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </ScrollView>
+    </ScrollView></SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0fdf4' },
-  content: { padding: 16, gap: 12, paddingBottom: 32 },
+  safeArea: { flex: 1, backgroundColor: WARM_THEME.background },
+  container: { flex: 1, backgroundColor: WARM_THEME.background },
+  content: { padding: WARM_THEME.spacingScreen, gap: 12, paddingBottom: 32 },
   header: {
-    backgroundColor: '#14532d',
-    borderRadius: 18,
+    backgroundColor: WARM_THEME.accent,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 16,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
   },
-  tag: { color: '#86efac', fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
-  title: { color: '#ffffff', fontSize: 20, fontWeight: '800', marginTop: 2 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tag: { color: WARM_THEME.accentSoft, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  title: { color: WARM_THEME.accentText, fontSize: 20, fontWeight: '800', marginTop: 2 },
+  headerRight: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   toggleBtn: {
     backgroundColor: 'rgba(255,255,255,0.16)',
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  toggleBtnText: { color: '#dcfce7', fontSize: 12, fontWeight: '700' },
+  toggleBtnText: { color: WARM_THEME.accentText, fontSize: 12, fontWeight: '700' },
   addBtn: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#16a34a',
+    backgroundColor: WARM_THEME.accentWarm,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  addBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  filterScroll: { flexGrow: 0 },
+  addBtnText: { color: WARM_THEME.accentText, fontSize: 13, fontWeight: '800' },
   filterChip: {
-    backgroundColor: '#ffffff',
+    backgroundColor: WARM_THEME.surface,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
+    borderRadius: WARM_THEME.radiusPill,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: WARM_THEME.border,
   },
-  filterChipActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
-  filterChipText: { fontSize: 12, fontWeight: '700', color: '#14532d' },
-  filterChipTextActive: { color: '#ffffff' },
+  filterChipActive: { backgroundColor: WARM_THEME.accent, borderColor: WARM_THEME.accent },
+  filterChipText: { fontSize: 12, fontWeight: '700', color: WARM_THEME.textSecondary },
+  filterChipTextActive: { color: WARM_THEME.accentText },
   emptyBox: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 20,
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderColor: WARM_THEME.border,
   },
-  emptyTitle: { fontSize: 15, fontWeight: '800', color: '#14532d' },
+  emptyTitle: { fontSize: 15, fontWeight: '800', color: WARM_THEME.textPrimary },
   zoneSection: { gap: 8 },
-  zoneTitle: { fontSize: 15, fontWeight: '800', color: '#14532d', marginTop: 4 },
+  zoneTitle: { fontSize: 15, fontWeight: '800', color: WARM_THEME.textPrimary, marginTop: 4 },
   plantCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
     padding: 14,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderColor: WARM_THEME.border,
   },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  plantTitle: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
-  sci: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  cardTop: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  plantTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 16,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  sci: { fontSize: 12, color: WARM_THEME.textSecondary, marginTop: 2 },
   stageBadge: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
   },
-  stageText: { fontSize: 11, fontWeight: '800', color: '#14532d' },
-  feedNote: { fontSize: 12, color: '#334155', lineHeight: 17 },
+  stageText: { fontSize: 11, fontWeight: '800', color: WARM_THEME.accentText },
+  feedNote: { fontSize: 12, color: WARM_THEME.textSecondary, lineHeight: 17 },
   qtyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -515,64 +530,74 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: WARM_THEME.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  miniBtnText: { fontSize: 16, fontWeight: '800', color: '#0f172a' },
-  qtyLabel: { fontSize: 12, fontWeight: '700', color: '#334155', marginHorizontal: 2 },
+  miniBtnText: { fontSize: 16, fontWeight: '800', color: WARM_THEME.textPrimary },
+  qtyLabel: { fontSize: 12, fontWeight: '700', color: WARM_THEME.textSecondary, marginHorizontal: 2 },
   carePill: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 10,
   },
-  carePillText: { fontSize: 11, fontWeight: '700', color: '#0369a1' },
+  carePillText: { fontSize: 11, fontWeight: '700', color: WARM_THEME.accent },
   feedPill: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.surfaceMuted,
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 10,
   },
-  feedPillText: { fontSize: 11, fontWeight: '700', color: '#15803d' },
+  feedPillText: { fontSize: 11, fontWeight: '700', color: WARM_THEME.accentWarm },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' },
   modalScroll: { flexGrow: 1, justifyContent: 'center', padding: 18 },
-  modalCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 18, gap: 10 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#14532d' },
-  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#334155' },
+  modalCard: {
+    backgroundColor: WARM_THEME.surface,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 18,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: WARM_THEME.textSecondary },
   presetChip: {
     paddingHorizontal: 11,
     paddingVertical: 6,
-    borderRadius: 14,
-    backgroundColor: '#f1f5f9',
-    marginRight: 6,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.surfaceMuted,
   },
-  presetChipActive: { backgroundColor: '#15803d' },
-  presetChipText: { fontSize: 12, fontWeight: '600', color: '#334155' },
-  presetChipTextActive: { color: '#ffffff' },
+  presetChipActive: { backgroundColor: WARM_THEME.accent },
+  presetChipText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
+  presetChipTextActive: { color: WARM_THEME.accentText },
   sameSiteBox: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: WARM_THEME.surfaceMuted,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: WARM_THEME.border,
     gap: 3,
   },
-  sameSiteTitle: { fontSize: 12, fontWeight: '700', color: '#14532d' },
-  sameSiteList: { fontSize: 12, color: '#475569', lineHeight: 16 },
+  sameSiteTitle: { fontSize: 12, fontWeight: '700', color: WARM_THEME.textPrimary },
+  sameSiteList: { fontSize: 12, color: WARM_THEME.textSecondary, lineHeight: 16 },
   input: {
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 14,
+    color: WARM_THEME.textPrimary,
+    backgroundColor: WARM_THEME.surface,
   },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   choicePill: {
@@ -580,45 +605,51 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#f8fafc',
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
   },
-  choicePillActive: { backgroundColor: '#15803d', borderColor: '#15803d' },
-  choicePillText: { fontSize: 12, fontWeight: '600', color: '#334155' },
-  choicePillTextActive: { color: '#ffffff' },
-  twoCol: { flexDirection: 'row', gap: 10 },
+  choicePillActive: { backgroundColor: WARM_THEME.accent, borderColor: WARM_THEME.accent },
+  choicePillText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
+  choicePillTextActive: { color: WARM_THEME.accentText },
+  twoCol: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   warningBox: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: WARM_THEME.surfaceMuted,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: WARM_THEME.accentWarm,
     gap: 4,
   },
-  warningText: { fontSize: 12, color: '#92400e', lineHeight: 16 },
+  warningText: { fontSize: 12, color: WARM_THEME.accentWarm, lineHeight: 16 },
   buddyBox: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: WARM_THEME.accentSoft,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#bbf7d0',
+    borderColor: WARM_THEME.border,
     gap: 4,
   },
-  buddyText: { fontSize: 12, color: '#166534', lineHeight: 16 },
-  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
+  buddyText: { fontSize: 12, color: WARM_THEME.accent, lineHeight: 16 },
+  modalActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 4,
+  },
   cancelBtn: {
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
+    borderColor: WARM_THEME.border,
   },
-  cancelText: { fontSize: 13, fontWeight: '700', color: '#475569' },
+  cancelText: { fontSize: 13, fontWeight: '700', color: WARM_THEME.textSecondary },
   saveBtn: {
-    backgroundColor: '#15803d',
+    backgroundColor: WARM_THEME.accent,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 10,
   },
-  saveText: { fontSize: 13, fontWeight: '800', color: '#ffffff' },
+  saveText: { fontSize: 13, fontWeight: '800', color: WARM_THEME.accentText },
 });
