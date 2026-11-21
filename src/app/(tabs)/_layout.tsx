@@ -59,4 +59,12 @@ export default function TabsLayout() {
       />
     </Tabs>
   );
-}
+}<Tabs.Screen
+  name="swap"
+  options={{
+    title: 'Swap',
+    tabBarIcon: ({ color, size }) => (
+      <Ionicons name="swap-horizontal" size={size} color={typeof color === 'string' ? color : undefined} />
+    ),
+  }}
+/>
