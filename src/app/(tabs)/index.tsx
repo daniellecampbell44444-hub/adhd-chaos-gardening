@@ -1,6 +1,6 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useGarden } from '../../context/GardenContext';
 
 interface WeatherData {
@@ -31,8 +31,9 @@ function describeWeather(code: number) {
 
 export default function PulseScreen() {
   const {
-    plants, harvests, expenses, user, syncStatus,
-    signUp, signIn, signOut, waterAll, feedAll, addHarvest, addExpense, loadSampleGarden,
+    plants, harvests, expenses, reminders, user, syncStatus,
+    signUp, signIn, signOut, waterAll, feedAll, addHarvest, addExpense,
+    toggleReminder, catchUpReminders, loadSampleGarden,
   } = useGarden();
 
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -103,160 +104,355 @@ export default function PulseScreen() {
   const totalSpent = expenses.reduce((s, e) => s + e.costAud, 0);
   const netSaved = totalEarned - totalSpent;
   const readyToPick = plants.filter(p => p.stage === 'Fruiting');
-  const peakMax = weather ? Math.max(weather.todayMax, weather.tomorrowMax) : null;
-  const lowMin = weather ? Math.min(weather.todayMin, weather.tomorrowMin) : null;
-  const highRain = weather ? Math.max(weather.todayRain, weather.tomorrowRain) : null;
+  const openReminders = reminders.filter(r => !r.done);
+  const peakMax = weather ? Math.max(weather.todayMax, weather.tomorrowMax) : 0;
+  const lowMin = weather ? Math.min(weather.todayMin, weather.tomorrowMin) : 99;
+  const highRain = weather ? Math.max(weather.todayRain, weather.tomorrowRain) : 0;
+  const wInfo = weather ? describeWeather(weather.code) : null;
+  const syncLabel = !user ? 'Cloud Backup' : syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Sync Error' : 'Synced ✓';
 
-  const submitHarvest = async () => {
-    if (!crop.trim() || !grams.trim()) return;
-    await addHarvest(crop.trim(), Number(grams));
+  // Build up to 3 high-impact focus items without overwhelming the screen
+  const focusItems: { id: string; label: string; meta: string; onPress: () => void }[] = [];
+  if (peakMax >= 35) {
+    focusItems.push({
+      id: 'heat-soak',
+      label: `Deep-soak pots & check shade (${peakMax}°C forecast)`,
+      meta: 'Heat priority',
+      onPress: () => {
+        waterAll();
+        Alert.alert('Soaked!', 'All plants marked watered ahead of the heat.');
+      },
+    });
+  }
+  if (readyToPick.length > 0) {
+    const firstCrop = readyToPick[0];
+    focusItems.push({
+      id: 'pick-ripe',
+      label: `Pick ripe ${firstCrop.variety} ${firstCrop.name} (${readyToPick.length} fruiting)`,
+      meta: 'Quick win',
+      onPress: () => {
+        setCrop(`${firstCrop.variety} ${firstCrop.name}`);
+        setModal('harvest');
+      },
+    });
+  }
+  for (const rem of openReminders) {
+    if (focusItems.length >= 3) break;
+    focusItems.push({
+      id: rem.id,
+      label: rem.title,
+      meta: rem.due,
+      onPress: () => toggleReminder(rem.id),
+    });
+  }
+  if (focusItems.length < 3 && plants.length > 0 && !focusItems.some(i => i.id === 'heat-soak')) {
+    focusItems.push({
+      id: 'quick-water',
+      label: 'Quick 2-minute pot & bed check-in',
+      meta: 'Low-pressure',
+      onPress: () => {
+        waterAll();
+        Alert.alert('Watered!', 'All plants logged as watered today.');
+      },
+    });
+  }
+  const topThree = focusItems.slice(0, 3);
+
+  const saveHarvest = () => {
+    if (!crop.trim() || !Number(grams)) return;
+    addHarvest(crop.trim(), Number(grams));
     setCrop('');
     setGrams('');
     setModal('none');
   };
 
-  const submitExpense = async () => {
-    if (!expItem.trim() || !expCost.trim()) return;
-addExpense(expItem.trim(), 'Garden', Number(expCost));
+  const saveExpense = () => {
+    if (!expItem.trim() || !Number(expCost)) return;
+    addExpense(expItem.trim(), 'Garden', Number(expCost));
     setExpItem('');
     setExpCost('');
     setModal('none');
   };
 
+  const handleCatchUpReset = () => {
+    if (openReminders.length === 0) {
+      Alert.alert('All caught up!', 'No overdue reminders waiting—zero guilt.');
+      return;
+    }
+    catchUpReminders();
+    Alert.alert('Fresh slate!', `${openReminders.length} open task(s) rolled smoothly into today with zero guilt.`);
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#f7f4ed' }}>
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: '#20352a' }}>Garden Pulse</Text>
-            <Text style={{ marginTop: 4, color: '#6b756f' }}>{syncStatus}</Text>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.hero}>
+        <View style={styles.heroTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroTag}>WESTERN SYDNEY • LIVE</Text>
+            <Text style={styles.heroTitle}>ADHD Chaos Gardening</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => setModal('auth')}
-            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#e5ede5', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Ionicons name={user ? 'person-circle' : 'person-circle-outline'} size={26} color="#20352a" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', gap: 6 }}>
+            <TouchableOpacity onPress={() => setModal('auth')} style={styles.cloudBtn}>
+              <Ionicons name={user ? 'cloud-done' : 'cloud-outline'} size={16} color="#dcfce7" />
+              <Text style={styles.cloudTxt}>{syncLabel}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn}>
+              <Ionicons name="refresh" size={16} color="#dcfce7" />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={{ marginTop: 24, padding: 18, borderRadius: 18, backgroundColor: '#20352a' }}>
-          {loadingWeather ? (
-            <ActivityIndicator color="#fff" />
-          ) : weather ? (
-            <>
-              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>
-                {describeWeather(weather.code).icon} {describeWeather(weather.code).label}
-              </Text>
-              <Text style={{ color: '#fff', fontSize: 38, fontWeight: '800', marginTop: 6 }}>
-                {weather.currentTemp}°C
-              </Text>
-              <Text style={{ color: '#d6dfd8', marginTop: 4 }}>
-                {weather.todayMin}°–{weather.todayMax}° · Rain {weather.todayRain}% · Humidity {weather.humidity}%
-              </Text>
-            </>
-          ) : (
-            <Text style={{ color: '#fff' }}>Weather unavailable</Text>
-          )}
-        </View>
-
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-          {[
-            ['Plants', `${totalPlants}`],
-            ['Varieties', `${uniqueVarieties}`],
-            ['Harvest', `${totalGrams}g`],
-            ['Net', `$${netSaved.toFixed(2)}`],
-          ].map(([label, value]) => (
-            <View key={label} style={{ width: '47%', padding: 16, borderRadius: 16, backgroundColor: '#fff' }}>
-              <Text style={{ color: '#7b847f', fontSize: 13 }}>{label}</Text>
-              <Text style={{ color: '#20352a', fontSize: 24, fontWeight: '800', marginTop: 4 }}>{value}</Text>
+        {loadingWeather && !weather ? (
+          <View style={styles.weatherLoading}>
+            <ActivityIndicator color="#86efac" size="small" />
+            <Text style={styles.heroSub}>Checking Western Sydney forecast...</Text>
+          </View>
+        ) : weather && wInfo ? (
+          <View style={styles.weatherBox}>
+            <View style={styles.weatherMain}>
+              <Text style={styles.tempNow}>{wInfo.icon} {weather.currentTemp}°C</Text>
+              <View>
+                <Text style={styles.weatherLabel}>{wInfo.label} • {weather.humidity}% humidity</Text>
+                <Text style={styles.weatherSub}>Today: {weather.todayMin}°–{weather.todayMax}°C • 💧 {weather.todayRain}% rain</Text>
+                <Text style={styles.weatherSub}>Tomorrow: {weather.tomorrowMin}°–{weather.tomorrowMax}°C • 💧 {weather.tomorrowRain}% rain</Text>
+              </View>
             </View>
-          ))}
-        </View>
-
-        {readyToPick.length > 0 && (
-          <View style={{ marginTop: 16, padding: 16, borderRadius: 16, backgroundColor: '#fff7dc' }}>
-            <Text style={{ fontWeight: '700', color: '#20352a' }}>Ready to pick: {readyToPick.length}</Text>
+            <Text style={styles.updatedTxt}>Updated {weather.updatedAt}</Text>
           </View>
+        ) : (
+          <Text style={styles.heroSub}>Offline mode — tap refresh to load live weather.</Text>
         )}
+      </View>
 
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-          <TouchableOpacity onPress={waterAll} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#dbe9f3', alignItems: 'center' }}>
-            <Text style={{ fontWeight: '700', color: '#20352a' }}>Water all</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={feedAll} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#e7ecd4', alignItems: 'center' }}>
-            <Text style={{ fontWeight: '700', color: '#20352a' }}>Feed all</Text>
+      <View style={styles.focusCard}>
+        <View style={styles.focusHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.focusTag}>NO OVERWHELM • MAX 3</Text>
+            <Text style={styles.focusTitle}>🎯 Top-3 Today</Text>
+          </View>
+          <TouchableOpacity style={styles.resetBtn} onPress={handleCatchUpReset}>
+            <Ionicons name="sparkles-outline" size={14} color="#14532d" />
+            <Text style={styles.resetBtnText}>Catch-Up Reset</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
-          <TouchableOpacity onPress={() => setModal('harvest')} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#20352a', alignItems: 'center' }}>
-            <Text style={{ fontWeight: '700', color: '#fff' }}>Log harvest</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setModal('expense')} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#20352a', alignItems: 'center' }}>
-            <Text style={{ fontWeight: '700', color: '#fff' }}>Log expense</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.focusHint}>
+          Tap an item to mark it done. Life got busy? Hit Catch-Up Reset—missed tasks roll forward with zero guilt.
+        </Text>
 
-        {peakMax !== null && lowMin !== null && highRain !== null && (
-          <Text style={{ marginTop: 16, color: '#7b847f', textAlign: 'center' }}>
-            2-day range: {lowMin}°–{peakMax}° · High rain chance {highRain}%
-          </Text>
+        {topThree.length === 0 ? (
+          <Text style={styles.emptyFocus}>Load your starter garden or add a plant to get gentle daily focus picks.</Text>
+        ) : (
+          topThree.map((item, idx) => (
+            <TouchableOpacity key={item.id} style={styles.focusRow} onPress={item.onPress}>
+              <View style={styles.focusNum}>
+                <Text style={styles.focusNumText}>{idx + 1}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.focusItemText}>{item.label}</Text>
+                <Text style={styles.focusMeta}>{item.meta}</Text>
+              </View>
+              <Ionicons name="checkmark-circle-outline" size={22} color="#15803d" />
+            </TouchableOpacity>
+          ))
         )}
-      </ScrollView>
+      </View>
 
-      <Modal visible={modal === 'harvest'} transparent animationType="slide" onRequestClose={() => setModal('none')}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
-          <View style={{ padding: 20, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: '#20352a' }}>Log harvest</Text>
-            <TextInput value={crop} onChangeText={setCrop} placeholder="Crop" style={{ marginTop: 16, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
-            <TextInput value={grams} onChangeText={setGrams} placeholder="Grams" keyboardType="numeric" style={{ marginTop: 10, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
-            <TouchableOpacity onPress={submitHarvest} style={{ marginTop: 12, padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Save harvest</Text>
-            </TouchableOpacity>
-          </View>
+      {weather && peakMax >= 38 && (
+        <View style={[styles.alertCard, styles.alertHeat]}>
+          <Text style={styles.alertTitle}>🔥 HEATWAVE ALERT ({peakMax}°C forecast)</Text>
+          <Text style={styles.alertBody}>Put up 30% shade cloth, deep-soak pots at dawn, and pause granular fertiliser until temps drop below 35°C.</Text>
         </View>
-      </Modal>
-
-      <Modal visible={modal === 'expense'} transparent animationType="slide" onRequestClose={() => setModal('none')}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
-          <View style={{ padding: 20, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: '#20352a' }}>Log expense</Text>
-            <TextInput value={expItem} onChangeText={setExpItem} placeholder="Item" style={{ marginTop: 16, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
-            <TextInput value={expCost} onChangeText={setExpCost} placeholder="Cost" keyboardType="decimal-pad" style={{ marginTop: 10, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
-            <TouchableOpacity onPress={submitExpense} style={{ marginTop: 12, padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Save expense</Text>
-            </TouchableOpacity>
-          </View>
+      )}
+      {weather && peakMax >= 35 && peakMax < 38 && (
+        <View style={[styles.alertCard, styles.alertWarm]}>
+          <Text style={styles.alertTitle}>☀️ HOT DAY CARE ({peakMax}°C forecast)</Text>
+          <Text style={styles.alertBody}>Water pots early morning and skip granular fertilisers today to avoid root burn.</Text>
         </View>
-      </Modal>
+      )}
+      {weather && lowMin <= 4 && (
+        <View style={[styles.alertCard, styles.alertFrost]}>
+          <Text style={styles.alertTitle}>❄️ FROST WATCH ({lowMin}°C overnight)</Text>
+          <Text style={styles.alertBody}>Cover chillies, capsicums, basil, and young citrus tonight or move pots under shelter.</Text>
+        </View>
+      )}
+      {weather && highRain >= 70 && (
+        <View style={[styles.alertCard, styles.alertRain]}>
+          <Text style={styles.alertTitle}>🌧️ RAIN INCOMING ({highRain}% chance)</Text>
+          <Text style={styles.alertBody}>You can likely skip watering open raised beds—check pot saucers so roots don’t sit in water.</Text>
+        </View>
+      )}
 
-      <Modal visible={modal === 'auth'} transparent animationType="slide" onRequestClose={() => setModal('none')}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
-          <View style={{ padding: 20, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
-            {user ? (
-              <TouchableOpacity onPress={async () => { await signOut(); setModal('none'); }} style={{ padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Sign out</Text>
+      <View style={styles.actionRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => { waterAll(); Alert.alert('Watered!', 'All plants logged as watered today.'); }}>
+          <Ionicons name="water" size={20} color="#0284c7" />
+          <Text style={styles.actionLabel}>Water All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => { feedAll(); Alert.alert('Fed!', 'All active plants logged as fed today.'); }}>
+          <Ionicons name="leaf" size={20} color="#15803d" />
+          <Text style={styles.actionLabel}>Bulk Feed</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('harvest')}>
+          <Ionicons name="basket" size={20} color="#d97706" />
+          <Text style={styles.actionLabel}>Log Yield</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('expense')}>
+          <Ionicons name="cash" size={20} color="#7c3aed" />
+          <Text style={styles.actionLabel}>Expense</Text>
+        </TouchableOpacity>
+      </View>
+
+      {readyToPick.length > 0 && (
+        <View style={styles.harvestBanner}>
+          <Text style={styles.bannerTitle}>READY TO HARVEST ({readyToPick.length})</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+            {readyToPick.map(p => (
+              <TouchableOpacity key={p.id} style={styles.pickChip} onPress={() => { setCrop(`${p.variety} ${p.name}`); setModal('harvest'); }}>
+                <Text style={styles.pickChipText}>{p.variety} {p.name} → Pick</Text>
               </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={styles.grid}>
+        <View style={styles.card}><Text style={styles.statNum}>{totalPlants}</Text><Text style={styles.statLabel}>Active Plants</Text></View>
+        <View style={styles.card}><Text style={styles.statNum}>{uniqueVarieties}</Text><Text style={styles.statLabel}>Varieties</Text></View>
+        <View style={styles.card}><Text style={styles.statNum}>{totalGrams >= 1000 ? `${(totalGrams / 1000).toFixed(2)}kg` : `${totalGrams}g`}</Text><Text style={styles.statLabel}>Total Harvest</Text></View>
+        <View style={styles.card}>
+          <Text style={[styles.statNum, { color: netSaved >= 0 ? '#15803d' : '#dc2626' }]}>
+            {netSaved >= 0 ? `$${netSaved.toFixed(2)}` : `-$${Math.abs(netSaved).toFixed(2)}`}
+          </Text>
+          <Text style={styles.statLabel}>Net Saved (AUD)</Text>
+        </View>
+      </View>
+
+      {plants.length === 0 && (
+        <TouchableOpacity style={styles.starterBtn} onPress={loadSampleGarden}>
+          <Ionicons name="sparkles" size={18} color="#ffffff" />
+          <Text style={styles.starterText}>Load Western Sydney Starter Garden</Text>
+        </TouchableOpacity>
+      )}
+
+      <Modal visible={modal !== 'none'} transparent animationType="slide">
+        <View style={styles.modalBg}>
+          <View style={styles.modalCard}>
+            {modal === 'auth' ? (
+              user ? (
+                <>
+                  <Text style={styles.modalTitle}>☁️ Cloud Sync Active</Text>
+                  <Text style={styles.alertBody}>Signed in as {user.email}</Text>
+                  <Text style={styles.alertBody}>Status: {syncLabel}</Text>
+                  <View style={styles.modalRow}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setModal('none')}><Text>Close</Text></TouchableOpacity>
+                    <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#dc2626' }]} onPress={async () => { await signOut(); setModal('none'); }}>
+                      <Text style={styles.saveText}>Sign Out</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.modalTitle}>{authMode === 'signup' ? 'Create Free Account' : 'Sign In to Cloud Sync'}</Text>
+                  <Text style={styles.alertBody}>Back up your plants, seeds, and harvests safely across devices.</Text>
+                  <TextInput placeholder="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" style={styles.input} />
+                  <TextInput placeholder="Password (6+ chars)" value={password} onChangeText={setPassword} secureTextEntry style={styles.input} />
+                  <TouchableOpacity onPress={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}>
+                    <Text style={styles.switchAuth}>{authMode === 'signin' ? "Don't have an account? Create one" : 'Already have an account? Sign in'}</Text>
+                  </TouchableOpacity>
+                  <View style={styles.modalRow}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={() => setModal('none')}><Text>Cancel</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.saveBtn} onPress={handleAuth} disabled={authBusy}>
+                      <Text style={styles.saveText}>{authBusy ? 'Please wait...' : authMode === 'signup' ? 'Sign Up' : 'Sign In'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )
+            ) : modal === 'harvest' ? (
+              <>
+                <Text style={styles.modalTitle}>Log Harvest Yield</Text>
+                <TextInput placeholder="Crop name (e.g. Tommy Toe Tomato)" value={crop} onChangeText={setCrop} style={styles.input} />
+                <TextInput placeholder="Weight in grams (e.g. 500)" value={grams} onChangeText={setGrams} keyboardType="numeric" style={styles.input} />
+                <View style={styles.modalRow}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setModal('none')}><Text>Cancel</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.saveBtn} onPress={saveHarvest}><Text style={styles.saveText}>Save Harvest</Text></TouchableOpacity>
+                </View>
+              </>
             ) : (
               <>
-                <View style={{ flexDirection: 'row', marginBottom: 12 }}>
-                  <TouchableOpacity onPress={() => setAuthMode('signin')} style={{ flex: 1, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontWeight: authMode === 'signin' ? '800' : '500' }}>Sign in</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setAuthMode('signup')} style={{ flex: 1, padding: 12, alignItems: 'center' }}>
-                    <Text style={{ fontWeight: authMode === 'signup' ? '800' : '500' }}>Sign up</Text>
-                  </TouchableOpacity>
+                <Text style={styles.modalTitle}>Log Garden Expense</Text>
+                <TextInput placeholder="Item (e.g. Mulch, Potting Mix)" value={expItem} onChangeText={setExpItem} style={styles.input} />
+                <TextInput placeholder="Cost in $ AUD (e.g. 15.50)" value={expCost} onChangeText={setExpCost} keyboardType="numeric" style={styles.input} />
+                <View style={styles.modalRow}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setModal('none')}><Text>Cancel</Text></TouchableOpacity>
+                  <TouchableOpacity style={styles.saveBtn} onPress={saveExpense}><Text style={styles.saveText}>Save Expense</Text></TouchableOpacity>
                 </View>
-                <TextInput value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" keyboardType="email-address" style={{ borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
-                <TextInput value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry style={{ marginTop: 10, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
-                <TouchableOpacity onPress={handleAuth} disabled={authBusy} style={{ marginTop: 12, padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
-                  {authBusy ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>{authMode === 'signin' ? 'Sign in' : 'Create account'}</Text>}
-                </TouchableOpacity>
               </>
             )}
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f0fdf4' },
+  content: { padding: 16, gap: 14, paddingBottom: 32 },
+  hero: { backgroundColor: '#14532d', borderRadius: 20, padding: 18 },
+  heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
+  heroTag: { color: '#86efac', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  heroTitle: { color: '#ffffff', fontSize: 21, fontWeight: '800', marginTop: 3 },
+  heroSub: { color: '#dcfce7', fontSize: 13, marginTop: 8 },
+  cloudBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.16)', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  cloudTxt: { color: '#dcfce7', fontSize: 11, fontWeight: '700' },
+  refreshBtn: { backgroundColor: 'rgba(255,255,255,0.14)', padding: 7, borderRadius: 10 },
+  weatherLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  weatherBox: { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 14, padding: 12 },
+  weatherMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  tempNow: { color: '#ffffff', fontSize: 28, fontWeight: '800' },
+  weatherLabel: { color: '#bbf7d0', fontSize: 13, fontWeight: '700' },
+  weatherSub: { color: '#dcfce7', fontSize: 12, marginTop: 2 },
+  updatedTxt: { color: '#86efac', fontSize: 10, marginTop: 6, textAlign: 'right' },
+  focusCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 16, borderWidth: 1, borderColor: '#bbf7d0', gap: 10 },
+  focusHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  focusTag: { fontSize: 10, fontWeight: '800', color: '#15803d', letterSpacing: 0.8 },
+  focusTitle: { fontSize: 18, fontWeight: '800', color: '#14532d', marginTop: 2 },
+  resetBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  resetBtnText: { fontSize: 12, fontWeight: '700', color: '#14532d' },
+  focusHint: { fontSize: 12, color: '#475569', lineHeight: 17 },
+  emptyFocus: { fontSize: 13, color: '#64748b', fontStyle: 'italic' },
+  focusRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#f8fafc', padding: 11, borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  focusNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#15803d', alignItems: 'center', justifyContent: 'center' },
+  focusNumText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  focusItemText: { fontSize: 13, fontWeight: '700', color: '#0f172a' },
+  focusMeta: { fontSize: 11, color: '#64748b', marginTop: 2 },
+  alertCard: { borderRadius: 14, padding: 14, borderWidth: 1 },
+  alertHeat: { backgroundColor: '#fee2e2', borderColor: '#fca5a5' },
+  alertWarm: { backgroundColor: '#fef3c7', borderColor: '#fcd34d' },
+  alertFrost: { backgroundColor: '#e0f2fe', borderColor: '#7dd3fc' },
+  alertRain: { backgroundColor: '#eff6ff', borderColor: '#93c5fd' },
+  alertTitle: { fontSize: 13, fontWeight: '800', color: '#0f172a' },
+  alertBody: { fontSize: 12, color: '#334155', marginTop: 4, lineHeight: 17 },
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  actionBtn: { flex: 1, backgroundColor: '#ffffff', borderRadius: 14, paddingVertical: 12, alignItems: 'center', borderWidth: 1, borderColor: '#dcfce7', gap: 4 },
+  actionLabel: { fontSize: 11, fontWeight: '700', color: '#1e293b' },
+  harvestBanner: { backgroundColor: '#fef3c7', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#fde68a' },
+  bannerTitle: { fontSize: 12, fontWeight: '800', color: '#92400e' },
+  pickChip: { backgroundColor: '#ffffff', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#fcd34d' },
+  pickChipText: { fontSize: 13, fontWeight: '700', color: '#78350f' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  card: { width: '48%', backgroundColor: '#ffffff', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#dcfce7' },
+  statNum: { fontSize: 24, fontWeight: '800', color: '#15803d' },
+  statLabel: { fontSize: 13, color: '#475569', marginTop: 4 },
+  starterBtn: { backgroundColor: '#15803d', borderRadius: 14, padding: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  starterText: { color: '#ffffff', fontWeight: '800', fontSize: 15 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#ffffff', borderRadius: 18, padding: 20, gap: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: '#14532d' },
+  input: { borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 12, fontSize: 15 },
+  switchAuth: { color: '#15803d', fontWeight: '700', fontSize: 13, textAlign: 'center', marginTop: 2 },
+  modalRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 6 },
+  cancelBtn: { paddingHorizontal: 16, paddingVertical: 10 },
+  saveBtn: { backgroundColor: '#15803d', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  saveText: { color: '#ffffff', fontWeight: '700' },
+});
