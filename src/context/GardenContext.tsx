@@ -6,9 +6,11 @@ import { supabase } from '../lib/supabase';
 export type Category = 'Vegetable' | 'Chilli' | 'Fruit' | 'Herb' | 'Leafy';
 export type Stage = 'Seedling' | 'Growing' | 'Flowering' | 'Fruiting' | 'Dormant';
 export type SyncStatus = 'local' | 'syncing' | 'synced' | 'error';
+export type WeatherMode = 'Normal' | 'Hot / Dry Spell' | 'Rain Day';
 export type PropagationMethod = 'Cutting' | 'Division' | 'Runner / Slip';
 export type PropagationMedium = 'Water' | 'Seed Raising Mix' | 'Perlite / Coco' | 'Direct Soil';
 export type PropagationStatus = 'Callusing / Rooting' | 'Roots Forming' | 'Ready to Pot Up';
+export type SoilCareType = 'Soil Mix' | 'Mulch Top-Up' | 'Compost / Worm Castings' | 'pH / Soil Amendment';
 
 export interface LibraryPlant {
   id: string; name: string; scientific: string; category: Category;
@@ -38,6 +40,16 @@ export interface PropagationItem {
   startedDate: string;
   targetSite: string;
   status: PropagationStatus;
+  notes?: string;
+}
+export interface SoilLogItem {
+  id: string;
+  site: string;
+  careType: SoilCareType;
+  material: string;
+  amountLabel: string;
+  phEstimate?: string;
+  date: string;
   notes?: string;
 }
 export interface HarvestLog { id: string; crop: string; grams: number; valueAud: number; date: string; }
@@ -92,6 +104,65 @@ export function getSmartFeed(plant: Plant, ferts: Fertilizer[]) {
   const boost = needsBoost ? ferts.find(f => f.feedType === 'Potash Boost' && (f.targets.includes(plant.category) || f.targets.includes('All'))) || null : null;
   const dose = primary ? (isPot ? primary.potDosage : primary.bedDosage) : '';
   return { primary, boost, note: `${isPot ? 'Pot' : 'Bed'} dose: ${dose}${boost ? ` + ${boost.name} for ${plant.stage.toLowerCase()}` : ''}` };
+}
+
+export function getWateringDueInfo(plant: Plant, weatherMode: WeatherMode) {
+  const isPot = plant.site.toLowerCase().includes('pot') || plant.site.toLowerCase().includes('bag');
+  let effectiveInterval = Math.max(1, plant.waterEveryDays || 2);
+
+  if (weatherMode === 'Hot / Dry Spell') {
+    effectiveInterval = isPot ? Math.max(1, effectiveInterval - 1) : Math.max(1, Math.floor(effectiveInterval * 0.75));
+  } else if (weatherMode === 'Rain Day') {
+    effectiveInterval = isPot ? effectiveInterval : effectiveInterval + 2;
+  }
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (!plant.lastWatered) {
+    return {
+      isDue: weatherMode !== 'Rain Day' || isPot,
+      statusLabel: weatherMode === 'Rain Day' && !isPot ? 'Rain Covered' : 'Due Now',
+      effectiveInterval,
+      reason:
+        weatherMode === 'Rain Day' && !isPot
+          ? 'Rain helps outdoor beds—still check covered pots or dry mix.'
+          : isPot
+            ? `No recent water log • Pot target every ${effectiveInterval}d`
+            : `No recent water log • Bed target every ${effectiveInterval}d`,
+    };
+  }
+
+  const lastMs = new Date(`${plant.lastWatered}T00:00:00`).getTime();
+  const nowMs = new Date(`${todayIso}T00:00:00`).getTime();
+  const daysSince = Number.isNaN(lastMs) ? effectiveInterval : Math.max(0, Math.floor((nowMs - lastMs) / 86400000));
+  const daysRemaining = effectiveInterval - daysSince;
+
+  if (weatherMode === 'Rain Day' && !isPot) {
+    return {
+      isDue: false,
+      statusLabel: 'Rain Skipped',
+      effectiveInterval,
+      reason: `Outdoor bed buffered by rain (${daysSince}d since last water).`,
+    };
+  }
+
+  if (daysRemaining <= 0) {
+    return {
+      isDue: true,
+      statusLabel: daysRemaining < 0 ? `${Math.abs(daysRemaining)}d Overdue` : 'Due Today',
+      effectiveInterval,
+      reason:
+        weatherMode === 'Hot / Dry Spell'
+          ? `Hot spell cadence (${effectiveInterval}d) • Last watered ${plant.lastWatered}`
+          : `${daysSince}d since water (${effectiveInterval}d target) • Last ${plant.lastWatered}`,
+    };
+  }
+
+  return {
+    isDue: false,
+    statusLabel: `In ${daysRemaining}d`,
+    effectiveInterval,
+    reason: `Last watered ${plant.lastWatered} • Next in ~${daysRemaining}d (${effectiveInterval}d cadence)`,
+  };
 }
 
 export function checkPlantPlacementWarnings(
@@ -162,9 +233,12 @@ interface GardenContextType {
   fertilizers: Fertilizer[];
   seeds: SeedItem[];
   propagations: PropagationItem[];
+  soilLogs: SoilLogItem[];
   harvests: HarvestLog[];
   expenses: ExpenseLog[];
   reminders: Reminder[];
+  weatherMode: WeatherMode;
+  setWeatherMode: (mode: WeatherMode) => void;
   user: User | null;
   syncStatus: SyncStatus;
   signUp: (email: string, password: string) => Promise<string | null>;
@@ -175,6 +249,7 @@ interface GardenContextType {
   cyclePlantStage: (id: string) => void;
   deletePlant: (id: string) => void;
   waterPlant: (id: string) => void;
+  waterDuePlants: () => void;
   feedPlant: (id: string) => void;
   waterAll: () => void;
   feedAll: () => void;
@@ -188,6 +263,8 @@ interface GardenContextType {
   cyclePropagationStatus: (id: string) => void;
   promotePropagationToPlant: (id: string) => void;
   deletePropagation: (id: string) => void;
+  addSoilLog: (item: Omit<SoilLogItem, 'id' | 'date'>) => void;
+  deleteSoilLog: (id: string) => void;
   addHarvest: (crop: string, grams: number, valueAud?: number) => void;
   addExpense: (item: string, category: string, costAud: number) => void;
   addReminder: (title: string, due: string) => void;
@@ -204,9 +281,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [fertilizers, setFertilizers] = useState<Fertilizer[]>([]);
   const [seeds, setSeeds] = useState<SeedItem[]>([]);
   const [propagations, setPropagations] = useState<PropagationItem[]>([]);
+  const [soilLogs, setSoilLogs] = useState<SoilLogItem[]>([]);
   const [harvests, setHarvests] = useState<HarvestLog[]>([]);
   const [expenses, setExpenses] = useState<ExpenseLog[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [weatherMode, setWeatherMode] = useState<WeatherMode>('Normal');
   const [loaded, setLoaded] = useState(false);
 
   const [user, setUser] = useState<User | null>(null);
@@ -222,9 +301,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           setFertilizers(d.fertilizers || []);
           setSeeds(d.seeds || []);
           setPropagations(d.propagations || []);
+          setSoilLogs(d.soilLogs || []);
           setHarvests(d.harvests || []);
           setExpenses(d.expenses || []);
           setReminders(d.reminders || []);
+          if (d.weatherMode) setWeatherMode(d.weatherMode);
         } catch {}
       }
       setLoaded(true);
@@ -267,6 +348,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         ((cloud.plants?.length || 0) > 0 ||
           (cloud.seeds?.length || 0) > 0 ||
           (cloud.propagations?.length || 0) > 0 ||
+          (cloud.soilLogs?.length || 0) > 0 ||
           (cloud.harvests?.length || 0) > 0);
       if (hasCloudData) {
         skipNextPush.current = true;
@@ -274,12 +356,14 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         setFertilizers(cloud.fertilizers || []);
         setSeeds(cloud.seeds || []);
         setPropagations(cloud.propagations || []);
+        setSoilLogs(cloud.soilLogs || []);
         setHarvests(cloud.harvests || []);
         setExpenses(cloud.expenses || []);
         setReminders(cloud.reminders || []);
+        if (cloud.weatherMode) setWeatherMode(cloud.weatherMode);
         setSyncStatus('synced');
       } else {
-        const payload = { plants, fertilizers, seeds, propagations, harvests, expenses, reminders };
+        const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, weatherMode };
         const { error: upErr } = await supabase
           .from('gardens')
           .upsert({ user_id: user.id, data: payload, updated_at: new Date().toISOString() });
@@ -291,7 +375,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return;
-    const payload = { plants, fertilizers, seeds, propagations, harvests, expenses, reminders };
+    const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, weatherMode };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
     if (!user) return;
@@ -309,7 +393,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [plants, fertilizers, seeds, propagations, harvests, expenses, reminders, loaded, user]);
+  }, [plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, weatherMode, loaded, user]);
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email: email.trim(), password });
@@ -344,6 +428,10 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     );
   const deletePlant = (id: string) => setPlants(prev => prev.filter(p => p.id !== id));
   const waterPlant = (id: string) => setPlants(prev => prev.map(p => (p.id === id ? { ...p, lastWatered: today() } : p)));
+  const waterDuePlants = () =>
+    setPlants(prev =>
+      prev.map(p => (getWateringDueInfo(p, weatherMode).isDue ? { ...p, lastWatered: today() } : p))
+    );
   const feedPlant = (id: string) => setPlants(prev => prev.map(p => (p.id === id ? { ...p, lastFed: today() } : p)));
   const waterAll = () => setPlants(prev => prev.map(p => ({ ...p, lastWatered: today() })));
   const feedAll = () =>
@@ -423,6 +511,12 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const deletePropagation = (id: string) =>
     setPropagations(prev => prev.filter(p => p.id !== id));
 
+  const addSoilLog = (item: Omit<SoilLogItem, 'id' | 'date'>) =>
+    setSoilLogs(prev => [{ ...item, id: uid(), date: today() }, ...prev]);
+
+  const deleteSoilLog = (id: string) =>
+    setSoilLogs(prev => prev.filter(s => s.id !== id));
+
   const addHarvest = (crop: string, grams: number, valueAud?: number) => {
     const m = PLANT_LIBRARY.find(l => crop.toLowerCase().includes(l.name.toLowerCase()));
     const est = valueAud ?? Number(((grams / 1000) * (m?.audPerKg || 8)).toFixed(2));
@@ -467,18 +561,17 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         status: 'Roots Forming',
         notes: 'Keep nodes submerged and refresh water every few days.',
       },
+    ]);
+    setSoilLogs([
       {
         id: uid(),
-        name: 'Mint',
-        variety: 'Spearmint',
-        category: 'Herb',
-        method: 'Division',
-        medium: 'Seed Raising Mix',
-        quantity: 3,
-        startedDate: today(),
-        targetSite: 'Pots',
-        status: 'Ready to Pot Up',
-        notes: 'Keep in its own pot so runners stay contained.',
+        site: 'Raised Beds',
+        careType: 'Mulch Top-Up',
+        material: 'Sugarcane Mulch',
+        amountLabel: '5cm layer',
+        phEstimate: '6.5',
+        date: today(),
+        notes: 'Kept clear of plant stems for summer heat.',
       },
     ]);
     setHarvests([
@@ -499,9 +592,12 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         fertilizers,
         seeds,
         propagations,
+        soilLogs,
         harvests,
         expenses,
         reminders,
+        weatherMode,
+        setWeatherMode,
         user,
         syncStatus,
         signUp,
@@ -512,6 +608,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         cyclePlantStage,
         deletePlant,
         waterPlant,
+        waterDuePlants,
         feedPlant,
         waterAll,
         feedAll,
@@ -525,6 +622,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         cyclePropagationStatus,
         promotePropagationToPlant,
         deletePropagation,
+        addSoilLog,
+        deleteSoilLog,
         addHarvest,
         addExpense,
         addReminder,
