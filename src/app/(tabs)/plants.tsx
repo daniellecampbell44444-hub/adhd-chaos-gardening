@@ -57,6 +57,10 @@ export default function PlantsScreen() {
     plants
   );
 
+  const plantsInSameSite = plants.filter(
+    p => p.site.trim().toLowerCase() === site.trim().toLowerCase()
+  );
+
   const applyLibraryPreset = (cropName: string) => {
     const match = PLANT_LIBRARY.find(item => item.name === cropName);
     setName(cropName);
@@ -244,6 +248,30 @@ export default function PlantsScreen() {
                 ))}
               </ScrollView>
 
+              {plants.length > 0 && (
+                <>
+                  <Text style={styles.fieldLabel}>Match Spot & Pot From Existing Plants</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {plants.slice(0, 8).map(existing => (
+                      <TouchableOpacity
+                        key={existing.id}
+                        style={styles.presetChip}
+                        onPress={() => {
+                          setName(existing.name);
+                          setCategory(existing.category);
+                          setSite(existing.site);
+                          setPotSize(existing.potSize);
+                        }}
+                      >
+                        <Text style={styles.presetChipText}>
+                          {existing.variety} {existing.name} ({existing.site})
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </>
+              )}
+
               <Text style={styles.fieldLabel}>Plant Name</Text>
               <TextInput
                 placeholder="e.g. Tomato, Chilli, Sweet Basil"
@@ -279,6 +307,19 @@ export default function PlantsScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {plantsInSameSite.length > 0 && (
+                <View style={styles.sameSiteBox}>
+                  <Text style={styles.sameSiteTitle}>
+                    Currently in {site} ({plantsInSameSite.reduce((sum, p) => sum + p.quantity, 0)}):
+                  </Text>
+                  <Text style={styles.sameSiteList}>
+                    {plantsInSameSite
+                      .map(p => `${p.quantity}× ${p.variety} ${p.name} (${p.potSize})`)
+                      .join(' • ')}
+                  </Text>
+                </View>
+              )}
 
               <Text style={styles.fieldLabel}>Pot / Container Size</Text>
               <TextInput
@@ -515,6 +556,16 @@ const styles = StyleSheet.create({
   presetChipActive: { backgroundColor: '#15803d' },
   presetChipText: { fontSize: 12, fontWeight: '600', color: '#334155' },
   presetChipTextActive: { color: '#ffffff' },
+  sameSiteBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    gap: 3,
+  },
+  sameSiteTitle: { fontSize: 12, fontWeight: '700', color: '#14532d' },
+  sameSiteList: { fontSize: 12, color: '#475569', lineHeight: 16 },
   input: {
     borderWidth: 1,
     borderColor: '#cbd5e1',
@@ -541,33 +592,33 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#fcd34d',
+    borderColor: '#fde68a',
     gap: 4,
   },
-  warningText: { color: '#92400e', fontSize: 12, fontWeight: '700', lineHeight: 17 },
+  warningText: { fontSize: 12, color: '#92400e', lineHeight: 16 },
   buddyBox: {
     backgroundColor: '#dcfce7',
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#86efac',
+    borderColor: '#bbf7d0',
     gap: 4,
   },
-  buddyText: { color: '#14532d', fontSize: 12, fontWeight: '600', lineHeight: 17 },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 6,
+  buddyText: { fontSize: 12, color: '#166534', lineHeight: 16 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
+  cancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
   },
-  cancelBtn: { paddingHorizontal: 14, paddingVertical: 10 },
-  cancelText: { color: '#475569', fontWeight: '700' },
+  cancelText: { fontSize: 13, fontWeight: '700', color: '#475569' },
   saveBtn: {
     backgroundColor: '#15803d',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 10,
   },
-  saveText: { color: '#ffffff', fontWeight: '800' },
+  saveText: { fontSize: 13, fontWeight: '800', color: '#ffffff' },
 });
