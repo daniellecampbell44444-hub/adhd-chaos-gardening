@@ -250,6 +250,7 @@ interface GardenContextType {
   deletePlant: (id: string) => void;
   waterPlant: (id: string) => void;
   waterDuePlants: () => void;
+  waterDuePots: () => void;
   feedPlant: (id: string) => void;
   waterAll: () => void;
   feedAll: () => void;
@@ -432,6 +433,13 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     setPlants(prev =>
       prev.map(p => (getWateringDueInfo(p, weatherMode).isDue ? { ...p, lastWatered: today() } : p))
     );
+  const waterDuePots = () =>
+    setPlants(prev =>
+      prev.map(p => {
+        const isPot = p.site.toLowerCase().includes("pot") || p.site.toLowerCase().includes("bag");
+        return isPot && getWateringDueInfo(p, weatherMode).isDue ? { ...p, lastWatered: today() } : p;
+      })
+    );
   const feedPlant = (id: string) => setPlants(prev => prev.map(p => (p.id === id ? { ...p, lastFed: today() } : p)));
   const waterAll = () => setPlants(prev => prev.map(p => ({ ...p, lastWatered: today() })));
   const feedAll = () =>
@@ -609,6 +617,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         deletePlant,
         waterPlant,
         waterDuePlants,
+        waterDuePots,
         feedPlant,
         waterAll,
         feedAll,

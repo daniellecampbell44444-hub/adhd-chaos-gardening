@@ -13,8 +13,10 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   useGarden,
   getSmartFeed,
+  getWateringDueInfo,
   AUSSIE_FERT_PRESETS,
   SoilCareType,
+  WeatherMode,
 } from '../../context/GardenContext';
 import { TROUBLE_GUIDE, TroubleCategory } from '../../data/troubleGuide';
 
@@ -36,6 +38,7 @@ const SOIL_CARE_TYPES: SoilCareType[] = [
 ];
 
 const SOIL_SITES = ['Raised Beds', 'Pots', 'Standing Bed', 'Front Yard', 'Backyard'];
+const WEATHER_MODES: WeatherMode[] = ['Normal', 'Hot / Dry Spell', 'Rain Day'];
 
 export default function CareScreen() {
   const {
@@ -43,7 +46,11 @@ export default function CareScreen() {
     fertilizers,
     soilLogs,
     reminders,
+    weatherMode,
+    setWeatherMode,
     waterPlant,
+    waterDuePlants,
+    waterDuePots,
     feedPlant,
     waterAll,
     feedAll,
@@ -56,10 +63,10 @@ export default function CareScreen() {
     catchUpReminders,
   } = useGarden();
 
+  const [dueOnlyFilter, setDueOnlyFilter] = useState(false);
   const [selectedTroubleCategory, setSelectedTroubleCategory] = useState<'All' | TroubleCategory>('All');
   const [expandedTroubleId, setExpandedTroubleId] = useState<string | null>(TROUBLE_GUIDE[0].id);
 
-  // Soil / Mulch / Compost modal state
   const [soilModalVisible, setSoilModalVisible] = useState(false);
   const [soilSite, setSoilSite] = useState('Raised Beds');
   const [careType, setCareType] = useState<SoilCareType>('Mulch Top-Up');
@@ -67,6 +74,21 @@ export default function CareScreen() {
   const [amountLabel, setAmountLabel] = useState('5cm layer');
   const [phEstimate, setPhEstimate] = useState('6.5');
   const [soilNotes, setSoilNotes] = useState('');
+
+  const duePlants = plants.filter(p => getWateringDueInfo(p, weatherMode).isDue);
+  const dueCount = duePlants.length;
+  const duePotsCount = duePlants.filter(
+    p => p.site.toLowerCase().includes('pot') || p.site.toLowerCase().includes('bag')
+  ).length;
+  const dueBedsCount = Math.max(0, dueCount - duePotsCount);
+  const visiblePlants = dueOnlyFilter ? duePlants : plants;
+
+  const weatherBannerText =
+    weatherMode === 'Hot / Dry Spell'
+      ? 'Hot / Dry Spell active: pot intervals tighten so containers don’t dry out; deep-soak at dawn and shade western sun.'
+      : weatherMode === 'Rain Day'
+        ? 'Rain Day active: outdoor beds are rain-buffered—skip routine bed watering, but still check pots under eaves or shade.'
+        : 'Normal weather cadence: watering due status follows each plant’s interval and last watered date.';
 
   const visibleTroubles =
     selectedTroubleCategory === 'All'
@@ -99,19 +121,133 @@ export default function CareScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.tag}>SMART CARE, SOIL & FIXES</Text>
-          <Text style={styles.title}>Care, Soil & Fixes</Text>
+          <Text style={styles.tag}>SMART CARE, WEATHER & SOIL</Text>
+          <Text style={styles.title}>Care, Water & Soil</Text>
         </View>
         <View style={styles.headerBtns}>
-          <TouchableOpacity style={styles.waterBtn} onPress={waterAll}>
+          <TouchableOpacity style={styles.waterBtn} onPress={waterDuePlants}>
             <Ionicons name="water" size={15} color="#ffffff" />
-            <Text style={styles.btnText}>Water All</Text>
+            <Text style={styles.btnText}>Water Due ({dueCount})</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.feedBtn} onPress={feedAll}>
             <Ionicons name="leaf" size={15} color="#ffffff" />
             <Text style={styles.btnText}>Feed All</Text>
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Watering Due Status & Hot-Weather vs Rain-Day Helper */}
+      <View style={styles.card}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Watering Weather & Due Helper</Text>
+          <Text style={[styles.badgeText, dueCount > 0 && styles.dueAlertBadge]}>
+            {duePotsCount} pots • {dueBedsCount} beds due
+          </Text>
+        </View>
+
+        <View style={styles.wrapRow}>
+          {WEATHER_MODES.map(mode => {
+            const active = weatherMode === mode;
+            return (
+              <TouchableOpacity
+                key={mode}
+                style={[styles.choicePill, active && styles.choicePillActive]}
+                onPress={() => setWeatherMode(mode)}
+              >
+                <Text
+                  style={[
+                    styles.choicePillText,
+                    active && styles.choicePillTextActive,
+                  ]}
+                >
+                  {mode}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={styles.weatherNote}>{weatherBannerText}</Text>
+
+        <View style={styles.rowBetween}>
+          <View style={styles.rowGap}>
+            <TouchableOpacity style={styles.dueActionBtn} onPress={waterDuePlants}>
+              <Text style={styles.dueActionBtnText}>Water Due ({dueCount})</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.potActionBtn} onPress={waterDuePots}>
+              <Text style={styles.potActionBtnText}>Due Pots ({duePotsCount})</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity onPress={waterAll}>
+            <Text style={styles.linkText}>Water All ({plants.length})</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Plant Care & Smart Feed */}
+      <View style={styles.card}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>
+            Plant Care & Smart Feed ({visiblePlants.length}/{plants.length})
+          </Text>
+          <TouchableOpacity
+            style={[styles.filterToggle, dueOnlyFilter && styles.filterToggleActive]}
+            onPress={() => setDueOnlyFilter(prev => !prev)}
+          >
+            <Text
+              style={[
+                styles.filterToggleText,
+                dueOnlyFilter && styles.filterToggleTextActive,
+              ]}
+            >
+              {dueOnlyFilter ? 'Showing Due Only' : 'Due Only'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {visiblePlants.length === 0 ? (
+          <Text style={styles.sub}>
+            {dueOnlyFilter
+              ? 'No plants are due right now under this weather mode.'
+              : 'No plants yet. Add plants on the Plants tab or load sample data on Pulse.'}
+          </Text>
+        ) : (
+          visiblePlants.map(p => {
+            const feed = getSmartFeed(p, fertilizers);
+            const dueInfo = getWateringDueInfo(p, weatherMode);
+            return (
+              <View key={p.id} style={styles.plantRow}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.titleRow}>
+                    <Text style={styles.itemTitle}>
+                      {p.variety} {p.name} ({p.quantity})
+                    </Text>
+                    <Text
+                      style={[
+                        styles.duePill,
+                        dueInfo.isDue ? styles.duePillActive : styles.duePillCalm,
+                      ]}
+                    >
+                      {dueInfo.statusLabel}
+                    </Text>
+                  </View>
+                  <Text style={styles.sub}>
+                    {p.site} • {p.stage} • {dueInfo.reason}
+                  </Text>
+                  <Text style={styles.feedNote}>{feed.note}</Text>
+                </View>
+                <View style={styles.rowGap}>
+                  <TouchableOpacity style={styles.smallWater} onPress={() => waterPlant(p.id)}>
+                    <Text style={styles.smallWaterText}>Water</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.smallFeed} onPress={() => feedPlant(p.id)}>
+                    <Text style={styles.smallFeedText}>Feed</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })
+        )}
       </View>
 
       {/* Soil, Mulch & Compost Tracker */}
@@ -244,41 +380,6 @@ export default function CareScreen() {
             </View>
           );
         })}
-      </View>
-
-      {/* Plant Care & Smart Feed */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Plant Care & Smart Feed ({plants.length})</Text>
-        {plants.length === 0 ? (
-          <Text style={styles.sub}>
-            No plants yet. Add plants on the Plants tab or load sample data on Pulse.
-          </Text>
-        ) : (
-          plants.map(p => {
-            const feed = getSmartFeed(p, fertilizers);
-            return (
-              <View key={p.id} style={styles.plantRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemTitle}>
-                    {p.variety} {p.name} ({p.quantity})
-                  </Text>
-                  <Text style={styles.sub}>
-                    {p.site} • {p.stage} • Every {p.waterEveryDays}d
-                  </Text>
-                  <Text style={styles.feedNote}>{feed.note}</Text>
-                </View>
-                <View style={styles.rowGap}>
-                  <TouchableOpacity style={styles.smallWater} onPress={() => waterPlant(p.id)}>
-                    <Text style={styles.smallWaterText}>Water</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.smallFeed} onPress={() => feedPlant(p.id)}>
-                    <Text style={styles.smallFeedText}>Feed</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })
-        )}
       </View>
 
       {/* My Fertilisers */}
@@ -496,7 +597,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  rowGap: { flexDirection: 'row', gap: 6 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  rowGap: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   sectionTitle: { fontSize: 15, fontWeight: '800', color: '#14532d' },
   badgeText: {
     fontSize: 11,
@@ -507,8 +615,56 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
   },
+  dueAlertBadge: {
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
+  },
+  weatherNote: { fontSize: 12, color: '#334155', lineHeight: 17 },
+  dueActionBtn: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  dueActionBtnText: { fontSize: 12, fontWeight: '800', color: '#0369a1' },
+  potActionBtn: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  potActionBtnText: { fontSize: 12, fontWeight: '800', color: '#92400e' },
+  filterToggle: {
+    backgroundColor: '#f8fafc',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  filterToggleActive: {
+    backgroundColor: '#15803d',
+    borderColor: '#15803d',
+  },
+  filterToggleText: { fontSize: 11, fontWeight: '800', color: '#334155' },
+  filterToggleTextActive: { color: '#ffffff' },
   linkText: { fontSize: 12, fontWeight: '800', color: '#15803d' },
   itemTitle: { fontSize: 14, fontWeight: '800', color: '#0f172a' },
+  duePill: {
+    fontSize: 10,
+    fontWeight: '800',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  duePillActive: {
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
+  },
+  duePillCalm: {
+    backgroundColor: '#e0f2fe',
+    color: '#0369a1',
+  },
   sub: { fontSize: 12, color: '#64748b', marginTop: 2, lineHeight: 17 },
   notesItalic: { fontSize: 12, color: '#334155', marginTop: 3, fontStyle: 'italic' },
   feedNote: { fontSize: 12, color: '#334155', marginTop: 4 },
