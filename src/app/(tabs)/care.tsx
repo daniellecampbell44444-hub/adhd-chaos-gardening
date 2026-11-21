@@ -15,6 +15,7 @@ import {
   getSmartFeed,
   getWateringDueInfo,
   AUSSIE_FERT_PRESETS,
+  PLANT_LIBRARY,
   SoilCareType,
   ScratchpadTag,
   PreservationMethod,
@@ -72,6 +73,7 @@ export default function CareScreen() {
     deleteScratchpadNote,
     addPreservationBatch,
     deletePreservationBatch,
+    addHarvest,
   } = useGarden();
 
   const [dueOnlyFilter, setDueOnlyFilter] = useState(false);
@@ -135,6 +137,29 @@ export default function CareScreen() {
     batchMethodFilter === 'All'
       ? preservationBatches
       : preservationBatches.filter(b => b.method === batchMethodFilter);
+
+  const handleQuickHarvestFromBatch = (produce: string, yieldLabel: string) => {
+    const kgMatch = yieldLabel.match(/(\d+(?:\.\d+)?)\s*kg/i);
+    const gMatch = yieldLabel.match(/(\d+(?:\.\d+)?)\s*g\b/i);
+    let grams = 500;
+    if (kgMatch) {
+      grams = Math.max(50, Math.round(Number(kgMatch[1]) * 1000));
+    } else if (gMatch) {
+      grams = Math.max(50, Math.round(Number(gMatch[1])));
+    }
+    const libMatch = PLANT_LIBRARY.find(
+      item =>
+        produce.toLowerCase().includes(item.name.toLowerCase()) ||
+        item.name.toLowerCase().includes(produce.toLowerCase())
+    );
+    const ratePerKg = libMatch?.audPerKg || 9.0;
+    const estValue = Number(((grams / 1000) * ratePerKg).toFixed(2));
+    addHarvest(produce, grams, estValue);
+    Alert.alert(
+      "Harvest logged",
+      `Logged ${grams}g of ${produce} (est. ${estValue.toFixed(2)} AUD).`
+    );
+  };
 
   const handleSaveBatchLog = () => {
     if (!batchProduce.trim()) {
@@ -612,9 +637,17 @@ export default function CareScreen() {
                 {batch.processNote ? <Text style={styles.feedNote}>Run: {batch.processNote}</Text> : null}
                 {batch.scrapNote ? <Text style={styles.notesItalic}>Zero-waste / scrap: {batch.scrapNote}</Text> : null}
               </View>
-              <TouchableOpacity onPress={() => deletePreservationBatch(batch.id)}>
-                <Text style={styles.del}>✕</Text>
-              </TouchableOpacity>
+              <View style={styles.rowGap}>
+                <TouchableOpacity
+                  style={styles.miniActionPill}
+                  onPress={() => handleQuickHarvestFromBatch(batch.produce, batch.yieldLabel)}
+                >
+                  <Text style={styles.miniActionText}>+ Harvest</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deletePreservationBatch(batch.id)}>
+                  <Text style={styles.del}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))
         )}
