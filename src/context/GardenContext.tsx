@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 export type Category = 'Vegetable' | 'Chilli' | 'Fruit' | 'Herb' | 'Leafy';
@@ -193,7 +193,84 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [plants, fertilizers, seeds, harvests, expenses, reminders, loaded, user]);
+}, [plants, fertilizers, seeds, harvests, expenses, reminders, loaded, user]);
+const signUp = async (email: string, password: string) => {
+  const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+  return error ? error.message : null;
+};
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase
+  const signIn = async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    return error ? error.message : null;
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  const addPlant = (plant: Omit<Plant, 'id'>) => setPlants(current => [...current, { ...plant, id: makeId() }]);
+  const updatePlantQty = (id: string, delta: number) => setPlants(current => current.map(plant =>
+    plant.id === id ? { ...plant, quantity: Math.max(0, plant.quantity + delta) } : plant,
+  ));
+  const cyclePlantStage = (id: string) => {
+    const stages: Stage[] = ['Seedling', 'Growing', 'Flowering', 'Fruiting', 'Dormant'];
+    setPlants(current => current.map(plant => plant.id === id
+      ? { ...plant, stage: stages[(stages.indexOf(plant.stage) + 1) % stages.length] }
+      : plant,
+    ));
+  };
+  const deletePlant = (id: string) => setPlants(current => current.filter(plant => plant.id !== id));
+  const waterPlant = (id: string) => setPlants(current => current.map(plant => plant.id === id ? { ...plant, lastWatered: today() } : plant));
+  const feedPlant = (id: string) => setPlants(current => current.map(plant => plant.id === id ? { ...plant, lastFed: today() } : plant));
+  const waterAll = () => setPlants(current => current.map(plant => ({ ...plant, lastWatered: today() })));
+  const feedAll = () => setPlants(current => current.map(plant => ({ ...plant, lastFed: today() })));
+
+  const addFertilizer = (fertilizer: Omit<Fertilizer, 'id'>) => setFertilizers(current => [...current, { ...fertilizer, id: makeId() }]);
+  const deleteFertilizer = (id: string) => setFertilizers(current => current.filter(fertilizer => fertilizer.id !== id));
+  const addSeed = (seed: Omit<SeedItem, 'id'>) => setSeeds(current => [...current, { ...seed, id: makeId() }]);
+  const updateSeedCount = (id: string, field: 'packets' | 'approxSeeds', delta: number) => setSeeds(current => current.map(seed =>
+    seed.id === id ? { ...seed, [field]: Math.max(0, seed[field] + delta) } : seed,
+  ));
+  const sowSeed = (id: string) => setSeeds(current => current.map(seed =>
+    seed.id === id ? { ...seed, packets: Math.max(0, seed.packets - 1) } : seed,
+  ));
+  const deleteSeed = (id: string) => setSeeds(current => current.filter(seed => seed.id !== id));
+
+  const addHarvest = (crop: string, grams: number, valueAud = 0) => setHarvests(current => [
+    ...current, { id: makeId(), crop, grams, valueAud, date: today() },
+  ]);
+  const addExpense = (item: string, category: string, costAud: number) => setExpenses(current => [
+    ...current, { id: makeId(), item, category, costAud, date: today() },
+  ]);
+  const addReminder = (title: string, due: string) => setReminders(current => [...current, { id: makeId(), title, due, done: false }]);
+  const toggleReminder = (id: string) => setReminders(current => current.map(reminder =>
+    reminder.id === id ? { ...reminder, done: !reminder.done } : reminder,
+  ));
+  const loadSampleGarden = () => {
+    setPlants([
+      { id: makeId(), name: 'Tomato', variety: 'Cherry', scientific: 'Solanum lycopersicum', category: 'Vegetable', quantity: 2, site: 'Patio pot', stage: 'Growing', potSize: '35L', idealTemp: '18–29°C', waterEveryDays: 2 },
+      { id: makeId(), name: 'Sweet Basil', variety: 'Genovese', scientific: 'Ocimum basilicum', category: 'Herb', quantity: 1, site: 'Patio pot', stage: 'Growing', potSize: '6L', idealTemp: '18–30°C', waterEveryDays: 1 },
+    ]);
+  };
+
+  return (
+    <GardenContext.Provider value={{
+      plants, fertilizers, seeds, harvests, expenses, reminders, user, syncStatus,
+      signUp, signIn, signOut, addPlant, updatePlantQty, cyclePlantStage, deletePlant,
+      waterPlant, feedPlant, waterAll, feedAll, addFertilizer, deleteFertilizer,
+      addSeed, updateSeedCount, sowSeed, deleteSeed, addHarvest, addExpense,
+      addReminder, toggleReminder, loadSampleGarden,
+    }}>
+      {children}
+    </GardenContext.Provider>
+  );
+}
+
+export function useGarden() {
+  const context = useContext(GardenContext);
+  if (!context) throw new Error('useGarden must be used within a GardenProvider');
+  return context;
+}

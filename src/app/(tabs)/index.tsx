@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useGarden } from '../../context/GardenContext';
 
 interface WeatherData {
@@ -32,8 +32,7 @@ function describeWeather(code: number) {
 export default function PulseScreen() {
   const {
     plants, harvests, expenses, user, syncStatus,
-    signUp, signIn, signOut,
-    waterAll, feedAll, addHarvest, addExpense, loadSampleGarden,
+    signUp, signIn, signOut, waterAll, feedAll, addHarvest, addExpense, loadSampleGarden,
   } = useGarden();
 
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -43,8 +42,6 @@ export default function PulseScreen() {
   const [grams, setGrams] = useState('');
   const [expItem, setExpItem] = useState('');
   const [expCost, setExpCost] = useState('');
-
-  // Auth modal state
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -68,7 +65,7 @@ export default function PulseScreen() {
         updatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       });
     } catch {
-      // Keeps previous weather
+      // Keep previous weather on error
     } finally {
       setLoadingWeather(false);
     }
@@ -84,11 +81,8 @@ export default function PulseScreen() {
       return;
     }
     setAuthBusy(true);
-    const err = authMode === 'signup'
-      ? await signUp(email, password)
-      : await signIn(email, password);
+    const err = authMode === 'signup' ? await signUp(email, password) : await signIn(email, password);
     setAuthBusy(false);
-
     if (err) {
       Alert.alert('Account Error', err);
     } else {
@@ -97,7 +91,7 @@ export default function PulseScreen() {
       setModal('none');
       Alert.alert(
         authMode === 'signup' ? 'Account Created!' : 'Welcome Back!',
-        'Your garden will now automatically sync to the cloud.'
+        'Your garden will now auto-sync to the cloud.'
       );
     }
   };
@@ -109,119 +103,160 @@ export default function PulseScreen() {
   const totalSpent = expenses.reduce((s, e) => s + e.costAud, 0);
   const netSaved = totalEarned - totalSpent;
   const readyToPick = plants.filter(p => p.stage === 'Fruiting');
+  const peakMax = weather ? Math.max(weather.todayMax, weather.tomorrowMax) : null;
+  const lowMin = weather ? Math.min(weather.todayMin, weather.tomorrowMin) : null;
+  const highRain = weather ? Math.max(weather.todayRain, weather.tomorrowRain) : null;
 
-  const peakMax = weather ? Math.max(weather.todayMax, weather.tomorrowMax) : 0;
-  const lowMin = weather ? Math.min(weather.todayMin, weather.tomorrowMin) : 99;
-  const highRain = weather ? Math.max(weather.todayRain, weather.tomorrowRain) : 0;
-
-  const saveHarvest = () => {
-    if (!crop.trim() || !Number(grams)) return;
-    addHarvest(crop.trim(), Number(grams));
-    setCrop(''); setGrams(''); setModal('none');
+  const submitHarvest = async () => {
+    if (!crop.trim() || !grams.trim()) return;
+    await addHarvest(crop.trim(), Number(grams));
+    setCrop('');
+    setGrams('');
+    setModal('none');
   };
 
-  const saveExpense = () => {
-    if (!expItem.trim() || !Number(expCost)) return;
-    addExpense(expItem.trim(), 'Garden', Number(expCost));
-    setExpItem(''); setExpCost(''); setModal('none');
+  const submitExpense = async () => {
+    if (!expItem.trim() || !expCost.trim()) return;
+addExpense(expItem.trim(), 'Garden', Number(expCost));
+    setExpItem('');
+    setExpCost('');
+    setModal('none');
   };
-
-  const wInfo = weather ? describeWeather(weather.code) : null;
-  const syncLabel = !user ? 'Cloud Backup' : syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Sync Error' : 'Synced ✓';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <View style={styles.heroTop}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.heroTag}>WESTERN SYDNEY • LIVE</Text>
-            <Text style={styles.heroTitle}>ADHD Chaos Gardening</Text>
+    <View style={{ flex: 1, backgroundColor: '#f7f4ed' }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={{ fontSize: 28, fontWeight: '800', color: '#20352a' }}>Garden Pulse</Text>
+            <Text style={{ marginTop: 4, color: '#6b756f' }}>{syncStatus}</Text>
           </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            <TouchableOpacity onPress={() => setModal('auth')} style={styles.cloudBtn}>
-              <Ionicons name={user ? 'cloud-done' : 'cloud-outline'} size={16} color="#dcfce7" />
-              <Text style={styles.cloudTxt}>{syncLabel}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn}>
-              <Ionicons name="refresh" size={16} color="#dcfce7" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            onPress={() => setModal('auth')}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#e5ede5', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name={user ? 'person-circle' : 'person-circle-outline'} size={26} color="#20352a" />
+          </TouchableOpacity>
         </View>
 
-        {loadingWeather && !weather ? (
-          <View style={styles.weatherLoading}>
-            <ActivityIndicator color="#86efac" size="small" />
-            <Text style={styles.heroSub}>Checking Western Sydney forecast...</Text>
-          </View>
-        ) : weather && wInfo ? (
-          <View style={styles.weatherBox}>
-            <View style={styles.weatherMain}>
-              <Text style={styles.tempNow}>{wInfo.icon} {weather.currentTemp}°C</Text>
-              <View>
-                <Text style={styles.weatherLabel}>{wInfo.label} • {weather.humidity}% humidity</Text>
-                <Text style={styles.weatherSub}>
-                  Today: {weather.todayMin}°–{weather.todayMax}°C • 💧 {weather.todayRain}% rain
-                </Text>
-                <Text style={styles.weatherSub}>
-                  Tomorrow: {weather.tomorrowMin}°–{weather.tomorrowMax}°C • 💧 {weather.tomorrowRain}% rain
-                </Text>
-              </View>
+        <View style={{ marginTop: 24, padding: 18, borderRadius: 18, backgroundColor: '#20352a' }}>
+          {loadingWeather ? (
+            <ActivityIndicator color="#fff" />
+          ) : weather ? (
+            <>
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '700' }}>
+                {describeWeather(weather.code).icon} {describeWeather(weather.code).label}
+              </Text>
+              <Text style={{ color: '#fff', fontSize: 38, fontWeight: '800', marginTop: 6 }}>
+                {weather.currentTemp}°C
+              </Text>
+              <Text style={{ color: '#d6dfd8', marginTop: 4 }}>
+                {weather.todayMin}°–{weather.todayMax}° · Rain {weather.todayRain}% · Humidity {weather.humidity}%
+              </Text>
+            </>
+          ) : (
+            <Text style={{ color: '#fff' }}>Weather unavailable</Text>
+          )}
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+          {[
+            ['Plants', `${totalPlants}`],
+            ['Varieties', `${uniqueVarieties}`],
+            ['Harvest', `${totalGrams}g`],
+            ['Net', `$${netSaved.toFixed(2)}`],
+          ].map(([label, value]) => (
+            <View key={label} style={{ width: '47%', padding: 16, borderRadius: 16, backgroundColor: '#fff' }}>
+              <Text style={{ color: '#7b847f', fontSize: 13 }}>{label}</Text>
+              <Text style={{ color: '#20352a', fontSize: 24, fontWeight: '800', marginTop: 4 }}>{value}</Text>
             </View>
-            <Text style={styles.updatedTxt}>Updated {weather.updatedAt}</Text>
+          ))}
+        </View>
+
+        {readyToPick.length > 0 && (
+          <View style={{ marginTop: 16, padding: 16, borderRadius: 16, backgroundColor: '#fff7dc' }}>
+            <Text style={{ fontWeight: '700', color: '#20352a' }}>Ready to pick: {readyToPick.length}</Text>
           </View>
-        ) : (
-          <Text style={styles.heroSub}>Offline mode — tap refresh to load live weather.</Text>
         )}
-      </View>
 
-      {weather && peakMax >= 38 && (
-        <View style={[styles.alertCard, styles.alertHeat]}>
-          <Text style={styles.alertTitle}>🔥 HEATWAVE ALERT ({peakMax}°C forecast)</Text>
-          <Text style={styles.alertBody}>
-            Put up 30% shade cloth, deep-soak pots at dawn, and pause granular fertiliser until temps drop below 35°C.
-          </Text>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+          <TouchableOpacity onPress={waterAll} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#dbe9f3', alignItems: 'center' }}>
+            <Text style={{ fontWeight: '700', color: '#20352a' }}>Water all</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={feedAll} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#e7ecd4', alignItems: 'center' }}>
+            <Text style={{ fontWeight: '700', color: '#20352a' }}>Feed all</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      {weather && peakMax >= 35 && peakMax < 38 && (
-        <View style={[styles.alertCard, styles.alertWarm]}>
-          <Text style={styles.alertTitle}>☀️ HOT DAY CARE ({peakMax}°C forecast)</Text>
-          <Text style={styles.alertBody}>
-            Water pots early morning and skip granular fertilisers today to avoid root burn.
-          </Text>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
+          <TouchableOpacity onPress={() => setModal('harvest')} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#20352a', alignItems: 'center' }}>
+            <Text style={{ fontWeight: '700', color: '#fff' }}>Log harvest</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setModal('expense')} style={{ flex: 1, padding: 16, borderRadius: 14, backgroundColor: '#20352a', alignItems: 'center' }}>
+            <Text style={{ fontWeight: '700', color: '#fff' }}>Log expense</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      {weather && lowMin <= 4 && (
-        <View style={[styles.alertCard, styles.alertFrost]}>
-          <Text style={styles.alertTitle}>❄️ FROST WATCH ({lowMin}°C overnight)</Text>
-          <Text style={styles.alertBody}>
-            Cover chillies, capsicums, basil, and young citrus tonight with frost cloth or move pots under shelter.
+        {peakMax !== null && lowMin !== null && highRain !== null && (
+          <Text style={{ marginTop: 16, color: '#7b847f', textAlign: 'center' }}>
+            2-day range: {lowMin}°–{peakMax}° · High rain chance {highRain}%
           </Text>
-        </View>
-      )}
+        )}
+      </ScrollView>
 
-      {weather && highRain >= 70 && (
-        <View style={[styles.alertCard, styles.alertRain]}>
-          <Text style={styles.alertTitle}>🌧️ RAIN INCOMING ({highRain}% chance)</Text>
-          <Text style={styles.alertBody}>
-            You can likely skip watering open raised beds—check pot saucers so roots don’t sit in water.
-          </Text>
+      <Modal visible={modal === 'harvest'} transparent animationType="slide" onRequestClose={() => setModal('none')}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+          <View style={{ padding: 20, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#20352a' }}>Log harvest</Text>
+            <TextInput value={crop} onChangeText={setCrop} placeholder="Crop" style={{ marginTop: 16, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
+            <TextInput value={grams} onChangeText={setGrams} placeholder="Grams" keyboardType="numeric" style={{ marginTop: 10, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
+            <TouchableOpacity onPress={submitHarvest} style={{ marginTop: 12, padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Save harvest</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      )}
+      </Modal>
 
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => { waterAll(); Alert.alert('Watered!', 'All plants logged as watered today.'); }}>
-          <Ionicons name="water" size={20} color="#0284c7" />
-          <Text style={styles.actionLabel}>Water All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => { feedAll(); Alert.alert('Fed!', 'All active plants logged as fed today.'); }}>
-          <Ionicons name="leaf" size={20} color="#15803d" />
-          <Text style={styles.actionLabel}>Bulk Feed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('harvest')}>
-          <Ionicons name="basket" size={20} color="#d97706" />
-          <Text style={styles.actionLabel}>Log Yield</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('expense')}>
-          <Ionicons name="cash" size={20} color="#7c3aed"
+      <Modal visible={modal === 'expense'} transparent animationType="slide" onRequestClose={() => setModal('none')}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+          <View style={{ padding: 20, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#20352a' }}>Log expense</Text>
+            <TextInput value={expItem} onChangeText={setExpItem} placeholder="Item" style={{ marginTop: 16, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
+            <TextInput value={expCost} onChangeText={setExpCost} placeholder="Cost" keyboardType="decimal-pad" style={{ marginTop: 10, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
+            <TouchableOpacity onPress={submitExpense} style={{ marginTop: 12, padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Save expense</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={modal === 'auth'} transparent animationType="slide" onRequestClose={() => setModal('none')}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.35)' }}>
+          <View style={{ padding: 20, backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+            {user ? (
+              <TouchableOpacity onPress={async () => { await signOut(); setModal('none'); }} style={{ padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Sign out</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+                  <TouchableOpacity onPress={() => setAuthMode('signin')} style={{ flex: 1, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontWeight: authMode === 'signin' ? '800' : '500' }}>Sign in</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setAuthMode('signup')} style={{ flex: 1, padding: 12, alignItems: 'center' }}>
+                    <Text style={{ fontWeight: authMode === 'signup' ? '800' : '500' }}>Sign up</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput value={email} onChangeText={setEmail} placeholder="Email" autoCapitalize="none" keyboardType="email-address" style={{ borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
+                <TextInput value={password} onChangeText={setPassword} placeholder="Password" secureTextEntry style={{ marginTop: 10, borderWidth: 1, borderColor: '#dfe4df', borderRadius: 12, padding: 14 }} />
+                <TouchableOpacity onPress={handleAuth} disabled={authBusy} style={{ marginTop: 12, padding: 16, borderRadius: 12, backgroundColor: '#20352a', alignItems: 'center' }}>
+                  {authBusy ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>{authMode === 'signin' ? 'Sign in' : 'Create account'}</Text>}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
