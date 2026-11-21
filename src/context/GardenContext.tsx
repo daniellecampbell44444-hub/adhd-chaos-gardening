@@ -12,6 +12,7 @@ export type PropagationMedium = 'Water' | 'Seed Raising Mix' | 'Perlite / Coco' 
 export type PropagationStatus = 'Callusing / Rooting' | 'Roots Forming' | 'Ready to Pot Up';
 export type SoilCareType = 'Soil Mix' | 'Mulch Top-Up' | 'Compost / Worm Castings' | 'pH / Soil Amendment';
 export type ScratchpadTag = 'Pest / Leaf' | 'Water / Sun' | 'Harvest / Kitchen' | 'Idea / To-Do';
+export type PreservationMethod = 'Dehydrating' | 'Canning' | 'Pickling' | 'Freezing / Jam';
 
 export interface LibraryPlant {
   id: string; name: string; scientific: string; category: Category;
@@ -63,6 +64,15 @@ export interface ScratchpadNote {
   site?: string;
   date: string;
   pinned?: boolean;
+}
+export interface PreservationBatch {
+  id: string;
+  produce: string;
+  method: PreservationMethod;
+  yieldLabel: string;
+  processNote?: string;
+  scrapNote?: string;
+  date: string;
 }
 
 export const PLANT_LIBRARY: LibraryPlant[] = [
@@ -247,6 +257,7 @@ interface GardenContextType {
   expenses: ExpenseLog[];
   reminders: Reminder[];
   scratchpadNotes: ScratchpadNote[];
+  preservationBatches: PreservationBatch[];
   weatherMode: WeatherMode;
   setWeatherMode: (mode: WeatherMode) => void;
   user: User | null;
@@ -284,6 +295,8 @@ interface GardenContextType {
   addScratchpadNote: (text: string, tag: ScratchpadTag, site?: string) => void;
   toggleScratchpadPin: (id: string) => void;
   deleteScratchpadNote: (id: string) => void;
+  addPreservationBatch: (batch: Omit<PreservationBatch, 'id' | 'date'>) => void;
+  deletePreservationBatch: (id: string) => void;
   loadSampleGarden: () => void;
 }
 
@@ -300,6 +313,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<ExpenseLog[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [scratchpadNotes, setScratchpadNotes] = useState<ScratchpadNote[]>([]);
+  const [preservationBatches, setPreservationBatches] = useState<PreservationBatch[]>([]);
   const [weatherMode, setWeatherMode] = useState<WeatherMode>('Normal');
   const [loaded, setLoaded] = useState(false);
 
@@ -381,7 +395,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         if (cloud.weatherMode) setWeatherMode(cloud.weatherMode);
         setSyncStatus('synced');
       } else {
-        const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode };
+        const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, preservationBatches, weatherMode };
         const { error: upErr } = await supabase
           .from('gardens')
           .upsert({ user_id: user.id, data: payload, updated_at: new Date().toISOString() });
@@ -393,7 +407,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return;
-    const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode };
+    const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, preservationBatches, weatherMode };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
     if (!user) return;
@@ -576,6 +590,10 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     );
   const deleteScratchpadNote = (id: string) =>
     setScratchpadNotes(prev => prev.filter(n => n.id !== id));
+  const addPreservationBatch = (batch: Omit<PreservationBatch, 'id' | 'date'>) =>
+    setPreservationBatches(prev => [{ ...batch, id: uid(), date: today() }, ...prev]);
+  const deletePreservationBatch = (id: string) =>
+    setPreservationBatches(prev => prev.filter(b => b.id !== id));
 
   const loadSampleGarden = () => {
     setPlants([
@@ -639,6 +657,17 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         pinned: true,
       },
     ]);
+    setPreservationBatches([
+      {
+        id: uid(),
+        produce: 'Lemons & Rinds',
+        method: 'Canning',
+        yieldLabel: '4 jars curd + candied peel',
+        processNote: 'Water-bath batch with brown sugar syrup',
+        scrapNote: 'Candied peels & citrus zest powder',
+        date: today(),
+      },
+    ]);
   };
 
   return (
@@ -653,6 +682,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         expenses,
         reminders,
         scratchpadNotes,
+        preservationBatches,
         weatherMode,
         setWeatherMode,
         user,
@@ -690,6 +720,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         addScratchpadNote,
         toggleScratchpadPin,
         deleteScratchpadNote,
+        addPreservationBatch,
+        deletePreservationBatch,
         loadSampleGarden,
       }}
     >

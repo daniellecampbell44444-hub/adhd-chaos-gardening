@@ -17,6 +17,7 @@ import {
   AUSSIE_FERT_PRESETS,
   SoilCareType,
   ScratchpadTag,
+  PreservationMethod,
   WeatherMode,
 } from '../../context/GardenContext';
 import { TROUBLE_GUIDE, TroubleCategory } from '../../data/troubleGuide';
@@ -40,6 +41,7 @@ const SOIL_CARE_TYPES: SoilCareType[] = [
 
 const SOIL_SITES = ['Raised Beds', 'Pots', 'Standing Bed', 'Front Yard', 'Backyard'];
 const SCRATCHPAD_TAGS: ScratchpadTag[] = ['Pest / Leaf', 'Water / Sun', 'Harvest / Kitchen', 'Idea / To-Do'];
+const PRESERVATION_METHODS: PreservationMethod[] = ['Dehydrating', 'Canning', 'Pickling', 'Freezing / Jam'];
 const WEATHER_MODES: WeatherMode[] = ['Normal', 'Hot / Dry Spell', 'Rain Day'];
 
 export default function CareScreen() {
@@ -49,6 +51,7 @@ export default function CareScreen() {
     soilLogs,
     reminders,
     scratchpadNotes,
+    preservationBatches,
     weatherMode,
     setWeatherMode,
     waterPlant,
@@ -67,6 +70,8 @@ export default function CareScreen() {
     addScratchpadNote,
     toggleScratchpadPin,
     deleteScratchpadNote,
+    addPreservationBatch,
+    deletePreservationBatch,
   } = useGarden();
 
   const [dueOnlyFilter, setDueOnlyFilter] = useState(false);
@@ -83,6 +88,13 @@ export default function CareScreen() {
   const [scratchpadText, setScratchpadText] = useState('');
   const [scratchpadTag, setScratchpadTag] = useState<ScratchpadTag>('Pest / Leaf');
   const [scratchpadSite, setScratchpadSite] = useState<string>('Pots');
+  const [batchModalVisible, setBatchModalVisible] = useState(false);
+  const [batchMethodFilter, setBatchMethodFilter] = useState<'All' | PreservationMethod>('All');
+  const [batchProduce, setBatchProduce] = useState('Chillies');
+  const [batchMethod, setBatchMethod] = useState<PreservationMethod>('Dehydrating');
+  const [batchYield, setBatchYield] = useState('2 trays / 180g dried');
+  const [batchProcessNote, setBatchProcessNote] = useState('55°C until crisp');
+  const [batchScrapNote, setBatchScrapNote] = useState('Blended into chilli powder');
 
   const duePlants = plants.filter(p => getWateringDueInfo(p, weatherMode).isDue);
   const dueCount = duePlants.length;
@@ -117,6 +129,26 @@ export default function CareScreen() {
     if (!scratchpadText.trim()) return;
     addScratchpadNote(scratchpadText, scratchpadTag, scratchpadSite);
     setScratchpadText('');
+  };
+
+  const visibleBatches =
+    batchMethodFilter === 'All'
+      ? preservationBatches
+      : preservationBatches.filter(b => b.method === batchMethodFilter);
+
+  const handleSaveBatchLog = () => {
+    if (!batchProduce.trim()) {
+      Alert.alert('Missing produce', 'Enter what crop or harvest batch you preserved.');
+      return;
+    }
+    addPreservationBatch({
+      produce: batchProduce.trim(),
+      method: batchMethod,
+      yieldLabel: batchYield.trim() || '1 batch',
+      processNote: batchProcessNote.trim() || undefined,
+      scrapNote: batchScrapNote.trim() || undefined,
+    });
+    setBatchModalVisible(false);
   };
 
   const handleSaveSoilLog = () => {
@@ -534,6 +566,60 @@ export default function CareScreen() {
         )}
       </View>
 
+      {/* Preservation & Bulk Harvest Batch Log */}
+      <View style={styles.card}>
+        <View style={styles.rowBetween}>
+          <Text style={styles.sectionTitle}>Preservation & Bulk Batches ({preservationBatches.length})</Text>
+          <TouchableOpacity style={styles.presetBtn} onPress={() => setBatchModalVisible(true)}>
+            <Text style={styles.presetBtnText}>+ Log Batch</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.sub}>
+          Track dehydrating trays, canning jars, pickling brines, bulk harvest weights, and scrap/peel repurposing.
+        </Text>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+          {(['All', ...PRESERVATION_METHODS] as const).map(method => {
+            const active = batchMethodFilter === method;
+            return (
+              <TouchableOpacity
+                key={method}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+                onPress={() => setBatchMethodFilter(method)}
+              >
+                <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                  {method}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {visibleBatches.length === 0 ? (
+          <Text style={styles.sub}>
+            No preservation runs logged in this view yet. Tap + Log Batch to record a run.
+          </Text>
+        ) : (
+          visibleBatches.map(batch => (
+            <View key={batch.id} style={styles.soilRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemTitle}>
+                  {batch.method} • {batch.produce}
+                </Text>
+                <Text style={styles.sub}>
+                  {batch.yieldLabel} • {batch.date}
+                </Text>
+                {batch.processNote ? <Text style={styles.feedNote}>Run: {batch.processNote}</Text> : null}
+                {batch.scrapNote ? <Text style={styles.notesItalic}>Zero-waste / scrap: {batch.scrapNote}</Text> : null}
+              </View>
+              <TouchableOpacity onPress={() => deletePreservationBatch(batch.id)}>
+                <Text style={styles.del}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </View>
+
       {/* Reminders */}
       <View style={styles.card}>
         <View style={styles.rowBetween}>
@@ -562,6 +648,78 @@ export default function CareScreen() {
           ))
         )}
       </View>
+
+      {/* Log Preservation / Bulk Harvest Batch Modal */}
+      <Modal visible={batchModalVisible} transparent animationType="slide">
+        <View style={styles.modalBg}>
+          <ScrollView contentContainerStyle={styles.modalScroll}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Log Preservation or Bulk Batch</Text>
+
+              <Text style={styles.fieldLabel}>Method</Text>
+              <View style={styles.wrapRow}>
+                {PRESERVATION_METHODS.map(method => (
+                  <TouchableOpacity
+                    key={method}
+                    style={[styles.choicePill, batchMethod === method && styles.choicePillActive]}
+                    onPress={() => setBatchMethod(method)}
+                  >
+                    <Text
+                      style={[
+                        styles.choicePillText,
+                        batchMethod === method && styles.choicePillTextActive,
+                      ]}
+                    >
+                      {method}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Crop / Harvest Item</Text>
+              <TextInput
+                value={batchProduce}
+                onChangeText={setBatchProduce}
+                placeholder="e.g. Chillies, Potatoes, Pineapples, Pickling Cucumbers"
+                style={styles.input}
+              />
+
+              <Text style={styles.fieldLabel}>Batch Output / Weight / Jars</Text>
+              <TextInput
+                value={batchYield}
+                onChangeText={setBatchYield}
+                placeholder="e.g. 6 jars, 16kg sliced, 4 trays"
+                style={styles.input}
+              />
+
+              <Text style={styles.fieldLabel}>Temp / Time / Brine Note (Optional)</Text>
+              <TextInput
+                value={batchProcessNote}
+                onChangeText={setBatchProcessNote}
+                placeholder="e.g. 55°C for 8h, brown sugar brine, water-bath"
+                style={styles.input}
+              />
+
+              <Text style={styles.fieldLabel}>Zero-Waste / Peel or Scrap Use (Optional)</Text>
+              <TextInput
+                value={batchScrapNote}
+                onChangeText={setBatchScrapNote}
+                placeholder="e.g. Candied rind, mash powder, scrap jelly"
+                style={styles.input}
+              />
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity onPress={() => setBatchModalVisible(false)}>
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveBatchLog}>
+                  <Text style={styles.saveText}>Save Batch</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
 
       {/* Log Soil / Mulch / Compost Modal */}
       <Modal visible={soilModalVisible} transparent animationType="slide">
