@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     Modal,
     ScrollView,
@@ -11,6 +12,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useGarden } from '../../context/GardenContext';
+import { supabase } from '../../lib/supabase';
 
 type ListingType = 'Seeds' | 'Plant';
 type OfferMode = 'Free' | 'For Sale';
@@ -26,23 +29,24 @@ interface SwapListing {
   suburb: string;
   notes: string;
   claimed?: boolean;
+  ownerId?: string | null;
 }
 
-const SWAP_STORAGE_KEY = 'adhd_chaos_gardening_swap_v1';
+const SWAP_CACHE_KEY = 'adhd_chaos_gardening_swap_cache_v1';
 
 const STARTER_LISTINGS: SwapListing[] = [
   {
-    id: 'swap-1',
+    id: 'swap-starter-1',
     title: 'Cherry Tomato Seeds',
     variety: 'Tommy Toe',
     itemType: 'Seeds',
     offerMode: 'Free',
     quantity: '2 packets (~25 seeds each)',
     suburb: 'Doonside NSW',
-    notes: 'Freshly saved from vigorous outdoor vines. Happy to share locally!',
+    notes: 'Freshly saved from outdoor vines. Happy to share locally!',
   },
   {
-    id: 'swap-2',
+    id: 'swap-starter-2',
     title: 'Jalapeño Chilli Potted Plant',
     variety: 'Early Jalapeño',
     itemType: 'Plant',
@@ -52,21 +56,31 @@ const STARTER_LISTINGS: SwapListing[] = [
     suburb: 'Blacktown NSW',
     notes: 'Hardened off in full sun, ~25cm tall in 140mm pots.',
   },
-  {
-    id: 'swap-3',
-    title: 'Sweet Basil Cuttings & Seeds',
-    variety: 'Genovese',
-    itemType: 'Seeds',
-    offerMode: 'Free',
-    quantity: '1 generous packet',
-    suburb: 'Rooty Hill NSW',
-    notes: 'Great companion for tomatoes and capsicums.',
-  },
 ];
 
+function mapRowToListing(row: any): SwapListing {
+  return {
+    id: String(row.id),
+    title: row.title ?? '',
+    variety: row.variety ?? '',
+    itemType: row.item_type === 'Plant' ? 'Plant' : 'Seeds',
+    offerMode: row.offer_mode === 'For Sale' ? 'For Sale' : 'Free',
+    priceAud: row.price_aud != null ? Number(row.price_aud) : undefined,
+    quantity: row.quantity ?? '1 available',
+    suburb: row.suburb ?? 'Western Sydney NSW',
+    notes: row.notes ?? '',
+    claimed: Boolean(row.claimed),
+    ownerId: row.owner_id ?? null,
+  };
+}
+
 export default function SwapScreen() {
+  const { user } = useGarden();
+
   const [listings, setListings] = useState<SwapListing[]>(STARTER_LISTINGS);
-  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [isLive, setIsLive] = useState(false);
   const [filterOffer, setFilterOffer] = useState<'All' | OfferMode>('All');
   const [filterType, setFilterType] = useState<'All' | ListingType>('All');
   const [modalVisible, setModalVisible] = useState(false);
@@ -81,47 +95,102 @@ export default function SwapScreen() {
   const [suburb, setSuburb] = useState('Doonside NSW');
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    AsyncStorage.getItem(SWAP_STORAGE_KEY)
-      .then(raw => {
-        if (raw) {
-          const parsed = JSON.parse(raw);
+  const fetchListings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('swap_listings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        setIsLive(false);
+        const cached = await AsyncStorage.getItem(SWAP_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setListings(parsed);
           }
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoaded(true));
+        return;
+      }
+
+      setIsLive(true);
+      const mapped = (data || []).map(mapRowToListing);
+      setListings(mapped);
+      await AsyncStorage.setItem(SWAP_CACHE_KEY, JSON.stringify(mapped));
+    } catch {
+      setIsLive(false);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
-    AsyncStorage.setItem(SWAP_STORAGE_KEY, JSON.stringify(listings)).catch(() => {});
-  }, [listings, loaded]);
+    fetchListings();
 
-  const handleAddListing = () => {
+    const channel = supabase
+      .channel('swap-listings-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'swap_listings' },
+        () => {
+          fetchListings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchListings]);
+
+  const handleAddListing = async () => {
     if (!title.trim()) {
       Alert.alert('Missing name', 'Add a seed or plant name so people know what you are sharing.');
       return;
     }
-    const parsedPrice = offerMode === 'For Sale' ? Number(priceText) : undefined;
+    const parsedPrice = offerMode === 'For Sale' ? Number(priceText) : null;
     if (offerMode === 'For Sale' && (!parsedPrice || parsedPrice <= 0)) {
       Alert.alert('Enter a price', 'Add a valid price in $ AUD for items listed For Sale.');
       return;
     }
 
+    setSubmitting(true);
     const newItem: SwapListing = {
-      id: `swap-${Date.now()}`,
+      id: `swap-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       title: title.trim(),
-      variety: variety.trim() || ' Heirloom / Mixed',
+      variety: variety.trim() || 'Heirloom / Mixed',
       itemType,
       offerMode,
-      priceAud: parsedPrice,
+      priceAud: parsedPrice ?? undefined,
       quantity: quantity.trim() || '1 available',
       suburb: suburb.trim() || 'Western Sydney NSW',
       notes: notes.trim() || 'Pickup or local swap details on request.',
+      claimed: false,
+      ownerId: user?.id ?? null,
     };
+
+    const { error } = await supabase.from('swap_listings').insert({
+      id: newItem.id,
+      title: newItem.title,
+      variety: newItem.variety,
+      item_type: newItem.itemType,
+      offer_mode: newItem.offerMode,
+      price_aud: parsedPrice,
+      quantity: newItem.quantity,
+      suburb: newItem.suburb,
+      notes: newItem.notes,
+      claimed: false,
+      owner_id: user?.id ?? null,
+    });
+
+    setSubmitting(false);
+
+    if (error) {
+      Alert.alert('Could not publish', error.message);
+      return;
+    }
 
     setListings(prev => [newItem, ...prev]);
     setTitle('');
@@ -132,19 +201,36 @@ export default function SwapScreen() {
     setModalVisible(false);
   };
 
-  const toggleClaimed = (id: string) => {
+  const toggleClaimed = async (item: SwapListing) => {
+    const nextClaimed = !item.claimed;
     setListings(prev =>
-      prev.map(item => (item.id === id ? { ...item, claimed: !item.claimed } : item))
+      prev.map(entry => (entry.id === item.id ? { ...entry, claimed: nextClaimed } : entry))
     );
+    const { error } = await supabase
+      .from('swap_listings')
+      .update({ claimed: nextClaimed })
+      .eq('id', item.id);
+
+    if (error) {
+      Alert.alert('Update failed', error.message);
+      fetchListings();
+    }
   };
 
   const removeListing = (id: string) => {
-    Alert.alert('Remove listing?', 'Delete this seed or plant post?', [
+    Alert.alert('Remove listing?', 'Delete this seed or plant post from the board?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => setListings(prev => prev.filter(item => item.id !== id)),
+        onPress: async () => {
+          setListings(prev => prev.filter(entry => entry.id !== id));
+          const { error } = await supabase.from('swap_listings').delete().eq('id', id);
+          if (error) {
+            Alert.alert('Delete failed', error.message);
+            fetchListings();
+          }
+        },
       },
     ]);
   };
@@ -160,16 +246,23 @@ export default function SwapScreen() {
       <View style={styles.headerCard}>
         <View style={styles.headerTop}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.tag}>COMMUNITY SEED & PLANT BOARD</Text>
+            <Text style={styles.tag}>
+              {isLive ? 'LIVE SUPABASE BOARD • MULTI-USER' : 'COMMUNITY SEED & PLANT BOARD'}
+            </Text>
             <Text style={styles.title}>Swap & Share</Text>
             <Text style={styles.subtitle}>
               List spare seeds or plants to give away free or sell locally.
             </Text>
           </View>
-          <TouchableOpacity style={styles.postBtn} onPress={() => setModalVisible(true)}>
-            <Ionicons name="add-circle" size={18} color="#ffffff" />
-            <Text style={styles.postBtnText}>Post Item</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.refreshChip} onPress={fetchListings}>
+              <Ionicons name="refresh" size={16} color="#dcfce7" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.postBtn} onPress={() => setModalVisible(true)}>
+              <Ionicons name="add-circle" size={18} color="#ffffff" />
+              <Text style={styles.postBtnText}>Post Item</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -208,7 +301,12 @@ export default function SwapScreen() {
         </View>
       </View>
 
-      {visibleListings.length === 0 ? (
+      {loading && listings.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <ActivityIndicator color="#15803d" />
+          <Text style={styles.emptySub}>Loading live community listings...</Text>
+        </View>
+      ) : visibleListings.length === 0 ? (
         <View style={styles.emptyCard}>
           <Ionicons name="leaf-outline" size={28} color="#15803d" />
           <Text style={styles.emptyTitle}>No matching listings yet</Text>
@@ -257,7 +355,7 @@ export default function SwapScreen() {
 
               <TouchableOpacity
                 style={[styles.claimBtn, item.claimed && styles.claimedBtn]}
-                onPress={() => toggleClaimed(item.id)}
+                onPress={() => toggleClaimed(item)}
               >
                 <Text style={[styles.claimBtnText, item.claimed && styles.claimedBtnText]}>
                   {item.claimed ? 'Claimed ✓' : 'Mark Claimed'}
@@ -364,11 +462,18 @@ export default function SwapScreen() {
               <TouchableOpacity
                 style={styles.cancelBtn}
                 onPress={() => setModalVisible(false)}
+                disabled={submitting}
               >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleAddListing}>
-                <Text style={styles.saveText}>Publish Listing</Text>
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleAddListing}
+                disabled={submitting}
+              >
+                <Text style={styles.saveText}>
+                  {submitting ? 'Publishing...' : 'Publish Listing'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -383,6 +488,12 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 14, paddingBottom: 32 },
   headerCard: { backgroundColor: '#14532d', borderRadius: 20, padding: 18 },
   headerTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  refreshChip: {
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    padding: 10,
+    borderRadius: 12,
+  },
   tag: { color: '#86efac', fontSize: 11, fontWeight: '700', letterSpacing: 0.8 },
   title: { color: '#ffffff', fontSize: 22, fontWeight: '800', marginTop: 2 },
   subtitle: { color: '#dcfce7', fontSize: 13, marginTop: 4, lineHeight: 18 },
