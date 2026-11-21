@@ -288,6 +288,8 @@ interface GardenContextType {
   deletePropagation: (id: string) => void;
   addSoilLog: (item: Omit<SoilLogItem, 'id' | 'date'>) => void;
   deleteSoilLog: (id: string) => void;
+  clearAllHarvests: () => void;
+  deleteHarvest: (id: string) => void;
   addHarvest: (crop: string, grams: number, valueAud?: number) => void;
   addExpense: (item: string, category: string, costAud: number) => void;
   addReminder: (title: string, due: string) => void;
@@ -560,6 +562,11 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const deleteSoilLog = (id: string) =>
     setSoilLogs(prev => prev.filter(s => s.id !== id));
 
+  const clearAllHarvests = () => setHarvests([]);
+
+  const deleteHarvest = (id: string) =>
+    setHarvests(prev => prev.filter(h => h.id !== id));
+
   const addHarvest = (crop: string, grams: number, valueAud?: number) => {
     const m = PLANT_LIBRARY.find(l => crop.toLowerCase().includes(l.name.toLowerCase()));
     const est = valueAud ?? Number(((grams / 1000) * (m?.audPerKg || 8)).toFixed(2));
@@ -731,6 +738,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         addSoilLog,
         deleteSoilLog,
         addHarvest,
+        deleteHarvest,
+        clearAllHarvests,
         addExpense,
         addReminder,
         toggleReminder,

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share } from 'react-native';
 import { useGarden } from '../../context/GardenContext';
 
 interface WeatherData {
@@ -54,10 +54,474 @@ function getPreservationIdea(cropName: string, grams: number): string {
   return `${cropName} (${weightLabel}): Dehydrate, blanch & freeze, or turn surplus into sauces/powders before it spoils.`;
 }
 
+
+function getHarvestChipValueAud(chipLabel: string, list: any[] = []): number {
+  if (!Array.isArray(list) || chipLabel === "All") {
+    return Array.isArray(list)
+      ? list.reduce((sum: any, h: any) => sum + (Number(h?.valueAud ?? h?.estimatedValue ?? h?.value ?? 0) || 0), 0)
+      : 0;
+  }
+  return list
+    .filter((h) => String(h?.crop || h?.spot || "").trim() === chipLabel)
+    .reduce((sum: any, h: any) => sum + (Number(h?.valueAud ?? h?.estimatedValue ?? h?.value ?? 0) || 0), 0);
+}
+
+
+
+// Safe fallbacks for PLANT_LIBRARY, preservationBatches, and hasPeriodFilter in index.tsx
+const PLANT_LIBRARY: any[] = [];
+const preservationBatches: any[] = [];
+const hasPeriodFilter: boolean = false;
+
+// Safe fallback declarations for cross-screen harvest helper blocks in index.tsx
+const targetList: any[] = [];
+const searchFilteredHarvests: any[] = [];
+const matchesHarvestPeriod = (_item: any, _period?: any): boolean => true;
+const harvestFilterMode: string = "crop";
+const resolveHarvestCategory = (_item: any): string => "Other";
+const setHarvests: React.Dispatch<React.SetStateAction<any[]>> = () => {};
+const selectedHarvestFilter: string = "All";
+const harvestSearchQuery: string = "";
+const setSelectedHarvestFilter: React.Dispatch<React.SetStateAction<string>> = () => {};
+const setHarvestSearchQuery: React.Dispatch<React.SetStateAction<string>> = () => {};
+
 export default function PulseScreen() {
+  
+        /* HARVEST_CHIP_SORT_TOGGLE */
+        const sortHarvestFilterChips = (chips: string[]) => {
+          const list = Array.isArray(chips) ? [...chips] : [];
+          const hasAll = list.includes("All");
+          const rest = list.filter(c => c !== "All");
+          const mode = typeof harvestChipSortMode !== "undefined" ? harvestChipSortMode : "weight";
+  
+          rest.sort((a, b) => {
+            if (mode === "name") {
+              return String(a).localeCompare(String(b), undefined, { sensitivity: "base" });
+            }
+            if (mode === "value") {
+              const valA = typeof getHarvestChipValueAud === "function" ? Number(getHarvestChipValueAud(a) || 0) : 0;
+              const valB = typeof getHarvestChipValueAud === "function" ? Number(getHarvestChipValueAud(b) || 0) : 0;
+              if (valB !== valA) return valB - valA;
+              return String(a).localeCompare(String(b), undefined, { sensitivity: "base" });
+            }
+            const wtA = typeof getHarvestChipGrams === "function" ? Number(getHarvestChipGrams(a) || 0) : 0;
+            const wtB = typeof getHarvestChipGrams === "function" ? Number(getHarvestChipGrams(b) || 0) : 0;
+            if (wtB !== wtA) return wtB - wtA;
+            return String(a).localeCompare(String(b), undefined, { sensitivity: "base" });
+          });
+  
+          return hasAll ? ["All", ...rest] : rest;
+        };
+  
+        const cycleHarvestChipSortMode = () => {
+          setHarvestChipSortMode(prev => (prev === "weight" ? "value" : prev === "value" ? "name" : "weight"));
+        };
+  
+  const [harvestChipSortMode, setHarvestChipSortMode] = useState<"weight" | "value" | "name">("weight");
+
+  
+        /* HARVEST_TOTAL_WEIGHT_VALUE_BAR */
+        const getHarvestWeightAndValueSummary = () => {
+          const list = typeof targetList !== "undefined" && Array.isArray(((globalThis as any).__targetList ?? []))
+            ? ((globalThis as any).__targetList ?? [])
+            : (harvests || []);
+          const totalGrams = list.reduce((sum: number, h: any) => sum + (Number(h?.grams) || 0), 0);
+          const totalValueAud = list.reduce((sum: number, h: any) => {
+            const val = Number(h?.valueAud ?? h?.estimatedValue ?? h?.value ?? 0);
+            return sum + (Number.isFinite(val) ? val : 0);
+          }, 0);
+          return {
+            count: list.length,
+            totalGrams,
+            totalValueAud,
+          };
+        };
+  
+  
+        /* HARVEST_RUNNER_UP_CROPS */
+        const getTopYieldingCropsList = (limit = 3) => {
+          const base = typeof searchFilteredHarvests !== "undefined" ? ((globalThis as any).__searchFilteredHarvests ?? []) : (harvests || []);
+          const periodFiltered = typeof harvestPeriodFilter !== "undefined" && harvestPeriodFilter !== "All"
+            ? base.filter((h: any) => {
+                if (typeof matchesHarvestPeriod === "function") return ((globalThis as any).__matchesHarvestPeriod ?? (() => true))(h, harvestPeriodFilter);
+                return true;
+              })
+            : base;
+  
+          const statsByCrop = new Map<string, { grams: number; count: number }>();
+          for (const h of periodFiltered) {
+            const cropName = String(h?.crop || "").trim();
+            if (!cropName) continue;
+            const prev = statsByCrop.get(cropName) || { grams: 0, count: 0 };
+            statsByCrop.set(cropName, {
+              grams: prev.grams + (Number(h?.grams) || 0),
+              count: prev.count + 1,
+            });
+          }
+  
+          return Array.from(statsByCrop.entries())
+            .filter(([, stat]) => stat.grams > 0)
+            .sort((a, b) => b[1].grams - a[1].grams)
+            .slice(0, limit)
+            .map(([crop, stat]) => ({ crop, grams: stat.grams, count: stat.count }));
+        };
+  
+  
+        /* HARVEST_TOP_PRODUCER_BANNER */
+        const getTopProducerStats = () => {
+          const base = typeof searchFilteredHarvests !== "undefined" ? ((globalThis as any).__searchFilteredHarvests ?? []) : (harvests || []);
+          const periodFiltered = typeof harvestPeriodFilter !== "undefined" && harvestPeriodFilter !== "All"
+            ? base.filter((h: any) => {
+                if (typeof matchesHarvestPeriod === "function") return ((globalThis as any).__matchesHarvestPeriod ?? (() => true))(h, harvestPeriodFilter);
+                return true;
+              })
+            : base;
+  
+          const statsByCrop = new Map<string, { grams: number; count: number }>();
+          for (const h of periodFiltered) {
+            const cropName = String(h?.crop || "").trim();
+            if (!cropName) continue;
+            const prev = statsByCrop.get(cropName) || { grams: 0, count: 0 };
+            statsByCrop.set(cropName, {
+              grams: prev.grams + (Number(h?.grams) || 0),
+              count: prev.count + 1,
+            });
+          }
+  
+          let bestCrop: string | null = null;
+          let bestGrams = 0;
+          let bestCount = 0;
+          for (const [cropName, stat] of statsByCrop.entries()) {
+            if (stat.grams > bestGrams) {
+              bestGrams = stat.grams;
+              bestCrop = cropName;
+              bestCount = stat.count;
+            }
+          }
+          return bestCrop && bestGrams > 0 ? { crop: bestCrop, grams: bestGrams, count: bestCount } : null;
+        };
+  
+  
+        /* HARVEST_TOP_CROP_CHIP */
+        const getTopYieldingCropLabel = () => {
+          const base = typeof searchFilteredHarvests !== "undefined" ? ((globalThis as any).__searchFilteredHarvests ?? []) : (harvests || []);
+          const periodFiltered = typeof harvestPeriodFilter !== "undefined" && harvestPeriodFilter !== "All"
+            ? base.filter((h: any) => {
+                if (typeof matchesHarvestPeriod === "function") return ((globalThis as any).__matchesHarvestPeriod ?? (() => true))(h, harvestPeriodFilter);
+                return true;
+              })
+            : base;
+  
+          const totalsByCrop = new Map<string, number>();
+          for (const h of periodFiltered) {
+            const cropName = String(h?.crop || "").trim();
+            if (!cropName) continue;
+            totalsByCrop.set(cropName, (totalsByCrop.get(cropName) || 0) + (Number(h?.grams) || 0));
+          }
+  
+          let bestCrop: string | null = null;
+          let bestGrams = 0;
+          for (const [cropName, gramsSum] of totalsByCrop.entries()) {
+            if (gramsSum > bestGrams) {
+              bestGrams = gramsSum;
+              bestCrop = cropName;
+            }
+          }
+          return bestGrams > 0 ? bestCrop : null;
+        };
+  
+  
+        /* HARVEST_CROP_CHIP_GRAMS */
+        const formatHarvestGrams = (totalGrams: number) => {
+          const safe = Number(totalGrams) || 0;
+          if (safe >= 1000) {
+            const kg = safe / 1000;
+            return `${Number.isInteger(kg) ? kg : kg.toFixed(1)}kg`;
+          }
+          return `${Math.round(safe)}g`;
+        };
+  
+        const getHarvestChipGrams = (chipLabel: string) => {
+          const base = typeof searchFilteredHarvests !== "undefined" ? ((globalThis as any).__searchFilteredHarvests ?? []) : (harvests || []);
+          const periodFiltered = typeof harvestPeriodFilter !== "undefined" && harvestPeriodFilter !== "All"
+            ? base.filter((h: any) => {
+                if (typeof matchesHarvestPeriod === "function") return ((globalThis as any).__matchesHarvestPeriod ?? (() => true))(h, harvestPeriodFilter);
+                return true;
+              })
+            : base;
+  
+          if (chipLabel === "All") {
+            return periodFiltered.reduce((sum: number, h: any) => sum + (Number(h?.grams) || 0), 0);
+          }
+          if (typeof harvestFilterMode !== "undefined" && ((globalThis as any).__harvestFilterMode ?? "crop") === "spot") {
+            return periodFiltered
+              .filter((h: any) => (h?.spot || "").trim() === chipLabel)
+              .reduce((sum: number, h: any) => sum + (Number(h?.grams) || 0), 0);
+          }
+          if (typeof harvestFilterMode !== "undefined" && ((globalThis as any).__harvestFilterMode ?? "crop") === "category") {
+            return periodFiltered
+              .filter((h: any) => {
+                if (typeof resolveHarvestCategory === "function") return resolveHarvestCategory(h) === chipLabel;
+                return false;
+              })
+              .reduce((sum: number, h: any) => sum + (Number(h?.grams) || 0), 0);
+          }
+          return periodFiltered
+            .filter((h: any) => (h?.crop || "").trim() === chipLabel)
+            .reduce((sum: number, h: any) => sum + (Number(h?.grams) || 0), 0);
+        };
+  
+  
+        /* HARVEST_DUPLICATE_LOG_BTN */
+        const handleDuplicateHarvestLog = (entry: any) => {
+          if (!entry) return;
+          const todayIso = new Date().toLocaleDateString("en-CA");
+          const cloned = {
+            ...entry,
+            id: `harvest-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            date: todayIso,
+          };
+          if (typeof setHarvests === "function") {
+            setHarvests((prev: any[]) => [cloned, ...(Array.isArray(prev) ? prev : [])]);
+          }
+        };
+  
+  const [harvestSortMode, setHarvestSortMode] = useState<"newest" | "heaviest">("newest");
+
+  
+      /* HARVEST_RESET_COUNT */
+      const getActiveHarvestResetCount = () => {
+        let n = 0;
+        if (typeof selectedHarvestFilter !== "undefined" && selectedHarvestFilter !== "All") n += 1;
+        if (typeof harvestPeriodFilter !== "undefined" && harvestPeriodFilter !== "All") n += 1;
+        if (typeof harvestSearchQuery !== "undefined" && harvestSearchQuery.trim().length > 0) n += 1;
+        if (typeof harvestChipSortMode !== "undefined" && harvestChipSortMode !== "weight") n += 1;
+        if (typeof harvestSortMode !== "undefined" && harvestSortMode !== "newest") n += 1;
+        return n;
+      };
+
+      const handleResetHarvestFilters = () => {
+        if (typeof setSelectedHarvestFilter === "function") setSelectedHarvestFilter("All");
+        if (typeof setHarvestPeriodFilter === "function") setHarvestPeriodFilter("All");
+        if (typeof setHarvestSearchQuery === "function") setHarvestSearchQuery("");
+      /* HARVEST_RESET_CHIP_SORT */
+      if (typeof setHarvestChipSortMode === "function") setHarvestChipSortMode("weight");
+      /* HARVEST_RESET_LOG_SORT */
+      if (typeof setHarvestSortMode === "function") setHarvestSortMode("newest");
+      };
+
+  const [harvestPeriodFilter, setHarvestPeriodFilter] = useState<string>("All");
+
+  const [copiedSummaryFeedback, setCopiedSummaryFeedback] = useState(false);
+  const buildHarvestSummaryText = () => {
+        const allList = harvests || [];
+        if (allList.length === 0) return null;
+        const hasFilter = typeof selectedHarvestFilter !== "undefined" && selectedHarvestFilter !== "All";
+      const hasPeriodFilter = typeof harvestPeriodFilter !== "undefined" && harvestPeriodFilter !== "All";
+        const hasSearch = typeof harvestSearchQuery !== "undefined" && harvestSearchQuery.trim().length > 0;
+        const rawTargetList = (hasFilter || hasPeriodFilter || hasSearch)
+          ? allList.filter(h => {
+              if (hasSearch) {
+                const q = harvestSearchQuery.trim().toLowerCase();
+                const hay = `${h.crop || ""} ${(h as any).spot || ""} ${(h as any).note || ""}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+              }
+              if (hasPeriodFilter && !((globalThis as any).__matchesHarvestPeriod ?? (() => true))(h, harvestPeriodFilter)) return false;
+            if (!hasFilter) return true;
+              if (typeof harvestFilterMode !== "undefined" && ((globalThis as any).__harvestFilterMode ?? "crop") === "spot") {
+                return ((h as any).spot || "").trim() === selectedHarvestFilter;
+              }
+              if (typeof harvestFilterMode !== "undefined" && ((globalThis as any).__harvestFilterMode ?? "crop") === "category") {
+                const cropLower = (h.crop || "").toLowerCase();
+                const found = typeof PLANT_LIBRARY !== "undefined"
+                  ? PLANT_LIBRARY.find(item => cropLower.includes(item.name.toLowerCase()) || item.name.toLowerCase().includes(cropLower))
+                  : undefined;
+                return (found?.category || "Other") === selectedHarvestFilter;
+              }
+              return (h.crop || "").trim() === selectedHarvestFilter;
+            })
+          : allList;
+      const targetList = typeof harvestSortMode !== "undefined" && harvestSortMode === "heaviest" ? [...rawTargetList].sort((a, b) => (Number(b?.grams) || 0) - (Number(a?.grams) || 0)) : rawTargetList;
+  
+        const totalGrams = ((globalThis as any).__targetList ?? []).reduce((sum: any, h: any) => sum + (Number(h.grams) || 0), 0);
+        const totalKg = (totalGrams / 1000).toFixed(2);
+        const totalAud = ((globalThis as any).__targetList ?? []).reduce((sum: any, h: any) => sum + (Number(h.valueAud) || 0), 0).toFixed(2);
+        const scopeLabel = hasFilter
+          ? selectedHarvestFilter
+          : hasSearch
+            ? `Search: "${harvestSearchQuery.trim()}"`
+            : "All Harvests";
+  
+        const batchList = typeof preservationBatches !== "undefined" && Array.isArray(preservationBatches) ? preservationBatches : [];
+        const methodCounts = batchList.reduce((acc: any, b: any) => {
+          const key = b.method || "Batch";
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {});
+        const methodSummary = Object.entries(methodCounts)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ");
+        const batchHeaderLine = batchList.length > 0
+          ? `Preservation & Bulk Batches: ${batchList.length} (${methodSummary})`
+          : "Preservation & Bulk Batches: 0";
+  
+        const lines = [
+          `Garden Harvest Summary (${scopeLabel})`,
+          `Total Weight: ${totalGrams}g (${totalKg} kg) | Est. Value: ${totalAud} AUD | Logs: ${((globalThis as any).__targetList ?? []).length}`,
+          batchHeaderLine,
+          "",
+          ...targetList.slice(0, 15).map(h => {
+            const spotPart = (h as any).spot ? ` [${(h as any).spot}]` : "";
+            const notePart = (h as any).note ? ` — ${(h as any).note}` : "";
+            return `• ${h.crop}: ${h.grams}g (${(Number(h.valueAud) || 0).toFixed(2)} AUD)${spotPart} (${h.date})${notePart}`;
+          }),
+        ];
+        if (((globalThis as any).__targetList ?? []).length > 15) {
+          lines.push(`...and ${((globalThis as any).__targetList ?? []).length - 15} more entries.`);
+        }
+        if (batchList.length > 0) {
+          lines.push("", "Recent Preservation Batches:");
+          for (const b of batchList.slice(0, 5)) {
+            const scrapPart = b.scrapNote ? ` | Scrap: ${b.scrapNote}` : "";
+            lines.push(`• [${b.method}] ${b.produce} — ${b.yieldLabel} (${b.date})${scrapPart}`);
+          }
+        }
+        return { summaryText: lines.join("\n"), scopeLabel };
+      };
+  
+      const handleCopyHarvestSummary = async () => {
+        const built = buildHarvestSummaryText();
+        if (!built) {
+          Alert.alert("No harvests yet", "Log a harvest first to copy a summary.");
+          return;
+        }
+        const { summaryText, scopeLabel } = built;
+        let copied = false;
+        try {
+          if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+            await navigator.clipboard.writeText(summaryText);
+            copied = true;
+          }
+        } catch {}
+        if (!copied) {
+          try {
+            const ExpoClipboard = require("expo-clipboard");
+            if (ExpoClipboard && typeof ExpoClipboard.setStringAsync === "function") {
+              await ExpoClipboard.setStringAsync(summaryText);
+              copied = true;
+            }
+          } catch {}
+        }
+        if (copied) {
+          setCopiedSummaryFeedback(true);
+          setTimeout(() => setCopiedSummaryFeedback(false), 2200);
+          Alert.alert("Copied ✓", `${scopeLabel} harvest & batch summary copied to clipboard.`);
+        } else {
+          await Share.share({ message: summaryText, title: `${scopeLabel} Summary` });
+        }
+      };
+
+  const handleShareHarvestSummary = async () => {
+        const allList = harvests || [];
+        if (allList.length === 0) {
+          Alert.alert("No harvests yet", "Log a harvest first to share a summary.");
+          return;
+        }
+        const hasFilter = typeof selectedHarvestFilter !== "undefined" && selectedHarvestFilter !== "All";
+        const hasSearch = typeof harvestSearchQuery !== "undefined" && harvestSearchQuery.trim().length > 0;
+        const rawTargetList = (hasFilter || hasPeriodFilter || hasSearch)
+          ? allList.filter(h => {
+              if (hasSearch) {
+                const q = harvestSearchQuery.trim().toLowerCase();
+                const hay = `${h.crop || ""} ${(h as any).spot || ""} ${(h as any).note || ""}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+              }
+              if (hasPeriodFilter && !((globalThis as any).__matchesHarvestPeriod ?? (() => true))(h, harvestPeriodFilter)) return false;
+            if (!hasFilter) return true;
+              if (typeof harvestFilterMode !== "undefined" && ((globalThis as any).__harvestFilterMode ?? "crop") === "spot") {
+                return ((h as any).spot || "").trim() === selectedHarvestFilter;
+              }
+              if (typeof harvestFilterMode !== "undefined" && ((globalThis as any).__harvestFilterMode ?? "crop") === "category") {
+                const cropLower = (h.crop || "").toLowerCase();
+                const found = typeof PLANT_LIBRARY !== "undefined"
+                  ? PLANT_LIBRARY.find(item => cropLower.includes(item.name.toLowerCase()) || item.name.toLowerCase().includes(cropLower))
+                  : undefined;
+                return (found?.category || "Other") === selectedHarvestFilter;
+              }
+              return (h.crop || "").trim() === selectedHarvestFilter;
+            })
+          : allList;
+      const targetList = typeof harvestSortMode !== "undefined" && harvestSortMode === "heaviest" ? [...rawTargetList].sort((a, b) => (Number(b?.grams) || 0) - (Number(a?.grams) || 0)) : rawTargetList;
+  
+        const totalGrams = ((globalThis as any).__targetList ?? []).reduce((sum: any, h: any) => sum + (Number(h.grams) || 0), 0);
+        const totalKg = (totalGrams / 1000).toFixed(2);
+        const totalAud = ((globalThis as any).__targetList ?? []).reduce((sum: any, h: any) => sum + (Number(h.valueAud) || 0), 0).toFixed(2);
+        const scopeLabel = hasFilter
+          ? selectedHarvestFilter
+          : hasSearch
+            ? `Search: "${harvestSearchQuery.trim()}"`
+            : "All Harvests";
+  
+        
+      {/* PRESERVATION_BATCH_SUMMARY_INCLUDED */}
+      const batchList = typeof preservationBatches !== "undefined" && Array.isArray(preservationBatches) ? preservationBatches : [];
+      const methodCounts = batchList.reduce((acc: any, b: any) => {
+        const key = b.method || "Batch";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
+      const methodSummary = Object.entries(methodCounts)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(", ");
+      const batchHeaderLine = batchList.length > 0
+        ? `Preservation & Bulk Batches: ${batchList.length} (${methodSummary})`
+        : "Preservation & Bulk Batches: 0";
+
+      const lines = [
+          `Garden Harvest Summary (${scopeLabel})`,
+          `Total Weight: ${totalGrams}g (${totalKg} kg) | Est. Value: ${totalAud} AUD | Logs: ${((globalThis as any).__targetList ?? []).length}`,
+          "",
+          ...targetList.slice(0, 15).map(h => {
+            const spotPart = (h as any).spot ? ` [${(h as any).spot}]` : "";
+            const notePart = (h as any).note ? ` — ${(h as any).note}` : "";
+            return `• ${h.crop}: ${h.grams}g (${(Number(h.valueAud) || 0).toFixed(2)} AUD)${spotPart} (${h.date})${notePart}`;
+          }),
+        ];
+        if (((globalThis as any).__targetList ?? []).length > 15) {
+          lines.push(`...and ${((globalThis as any).__targetList ?? []).length - 15} more entries.`);
+        }
+        
+      if (batchList.length > 0) {
+        lines.push("", "Recent Preservation Batches:");
+        for (const b of batchList.slice(0, 5)) {
+          const scrapPart = b.scrapNote ? ` | Scrap: ${b.scrapNote}` : "";
+          lines.push(`• [${b.method}] ${b.produce} — ${b.yieldLabel} (${b.date})${scrapPart}`);
+        }
+      }
+
+      const summaryText = lines.join("\n");
+        try {
+          await Share.share({ message: summaryText, title: `${scopeLabel} Summary` });
+        } catch {
+          Alert.alert("Harvest Summary", summaryText);
+        }
+      };
+
+  const handleConfirmClearAllHarvests = () => {
+        if (!clearAllHarvests || !(harvests || []).length) return;
+        Alert.alert(
+          "Clear all harvests?",
+          `This will remove all ${(harvests || []).length} logged harvest entries.`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Clear All", style: "destructive", onPress: () => clearAllHarvests() },
+          ]
+        );
+      };
+
   const {
     plants, harvests, expenses, reminders, seeds, user, syncStatus,
-    signUp, signIn, signOut, waterAll, feedAll, addHarvest, addExpense,
+    signUp, signIn, signOut, waterAll, feedAll, addHarvest, deleteHarvest, clearAllHarvests, addExpense,
     toggleReminder, catchUpReminders, loadSampleGarden,
   } = useGarden();
 
