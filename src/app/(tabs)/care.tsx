@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -53,6 +53,7 @@ export default function CareScreen() {
     reminders,
     scratchpadNotes,
     preservationBatches,
+    draftPreservation,
     weatherMode,
     setWeatherMode,
     waterPlant,
@@ -73,6 +74,7 @@ export default function CareScreen() {
     deleteScratchpadNote,
     addPreservationBatch,
     deletePreservationBatch,
+    clearDraftPreservation,
     addHarvest,
   } = useGarden();
 
@@ -97,6 +99,18 @@ export default function CareScreen() {
   const [batchYield, setBatchYield] = useState('2 trays / 180g dried');
   const [batchProcessNote, setBatchProcessNote] = useState('55°C until crisp');
   const [batchScrapNote, setBatchScrapNote] = useState('Blended into chilli powder');
+
+  useEffect(() => {
+    if (draftPreservation) {
+      setBatchProduce(draftPreservation.produce);
+      setBatchMethod(draftPreservation.method);
+      setBatchYield(draftPreservation.yieldLabel);
+      setBatchProcessNote(draftPreservation.processNote || '');
+      setBatchScrapNote(draftPreservation.scrapNote || '');
+      setBatchModalVisible(true);
+      clearDraftPreservation();
+    }
+  }, [draftPreservation]);
 
   const duePlants = plants.filter(p => getWateringDueInfo(p, weatherMode).isDue);
   const dueCount = duePlants.length;

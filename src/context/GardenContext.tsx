@@ -258,6 +258,7 @@ interface GardenContextType {
   reminders: Reminder[];
   scratchpadNotes: ScratchpadNote[];
   preservationBatches: PreservationBatch[];
+  draftPreservation: { produce: string; method: PreservationMethod; yieldLabel: string; processNote?: string; scrapNote?: string } | null;
   weatherMode: WeatherMode;
   setWeatherMode: (mode: WeatherMode) => void;
   user: User | null;
@@ -297,6 +298,8 @@ interface GardenContextType {
   deleteScratchpadNote: (id: string) => void;
   addPreservationBatch: (batch: Omit<PreservationBatch, 'id' | 'date'>) => void;
   deletePreservationBatch: (id: string) => void;
+  startPreservationFromHarvest: (harvestId: string, preferredMethod?: PreservationMethod) => void;
+  clearDraftPreservation: () => void;
   loadSampleGarden: () => void;
 }
 
@@ -314,6 +317,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [scratchpadNotes, setScratchpadNotes] = useState<ScratchpadNote[]>([]);
   const [preservationBatches, setPreservationBatches] = useState<PreservationBatch[]>([]);
+  const [draftPreservation, setDraftPreservation] = useState<{ produce: string; method: PreservationMethod; yieldLabel: string; processNote?: string; scrapNote?: string } | null>(null);
   const [weatherMode, setWeatherMode] = useState<WeatherMode>('Normal');
   const [loaded, setLoaded] = useState(false);
 
@@ -594,6 +598,19 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     setPreservationBatches(prev => [{ ...batch, id: uid(), date: today() }, ...prev]);
   const deletePreservationBatch = (id: string) =>
     setPreservationBatches(prev => prev.filter(b => b.id !== id));
+  const startPreservationFromHarvest = (harvestId: string, preferredMethod: PreservationMethod = 'Dehydrating') => {
+    const h = harvests.find(item => item.id === harvestId);
+    if (!h) return;
+    const weightLabel = h.grams >= 1000 ? `${(h.grams / 1000).toFixed(2).replace(/\.00$/, '')}kg` : `${h.grams}g`;
+    setDraftPreservation({
+      produce: h.crop,
+      method: preferredMethod,
+      yieldLabel: `${weightLabel} harvest batch`,
+      processNote: `From ${h.date} harvest (${h.grams}g, est. ${h.valueAud.toFixed(2)} AUD)`,
+      scrapNote: '',
+    });
+  };
+  const clearDraftPreservation = () => setDraftPreservation(null);
 
   const loadSampleGarden = () => {
     setPlants([
@@ -683,6 +700,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         reminders,
         scratchpadNotes,
         preservationBatches,
+        draftPreservation,
         weatherMode,
         setWeatherMode,
         user,
@@ -722,6 +740,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         deleteScratchpadNote,
         addPreservationBatch,
         deletePreservationBatch,
+        startPreservationFromHarvest,
+        clearDraftPreservation,
         loadSampleGarden,
       }}
     >
