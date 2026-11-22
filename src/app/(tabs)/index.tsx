@@ -544,6 +544,12 @@ export default function PulseScreen() {
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [modal, setModal] = useState<'none' | 'harvest' | 'expense' | 'auth'>('none');
   const [showSubscription, setShowSubscription] = useState(false);
+  const todayFocusKey = new Date().toLocaleDateString('en-CA');
+  const [focusCompletion, setFocusCompletion] = useState<{
+    day: string;
+    taskIds: string[];
+  }>({ day: todayFocusKey, taskIds: [] });
+  const [focusRotation, setFocusRotation] = useState(0);
   const [crop, setCrop] = useState('');
 const HARVEST_PLANT_CHIPS = Array.from(new Set(plants.map(p => (p.variety ? `${p.variety} ${p.name}` : p.name).trim()))).filter(Boolean).slice(0, 12);
   const [grams, setGrams] = useState('');
@@ -677,7 +683,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
     s => !s.wishlist && (s.packets <= 1 || s.approxSeeds <= 15)
   );
 
-  // Build up to 3 high-impact focus items without overwhelming the screen
+  // Keep a candidate pool so the card can rotate through only three at a time.
   const focusItems: { id: string; label: string; meta: string; onPress: () => void }[] = [];
   if (peakMax >= 35) {
     focusItems.push({
@@ -703,7 +709,6 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
     });
   }
   for (const rem of openReminders) {
-    if (focusItems.length >= 3) break;
     focusItems.push({
       id: rem.id,
       label: rem.title,
@@ -711,7 +716,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
       onPress: () => toggleReminder(rem.id),
     });
   }
-  if (focusItems.length < 3 && plants.length > 0 && !focusItems.some(i => i.id === 'heat-soak')) {
+  if (plants.length > 0 && !focusItems.some(i => i.id === 'quick-water')) {
     focusItems.push({
       id: 'quick-water',
       label: 'Quick 2-minute pot & bed check-in',
@@ -722,7 +727,35 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
       },
     });
   }
-  const topThree = focusItems.slice(0, 3);
+  const focusStartIndex = focusItems.length
+    ? focusRotation % focusItems.length
+    : 0;
+  const topThree = Array.from(
+    { length: Math.min(3, focusItems.length) },
+    (_, index) => focusItems[(focusStartIndex + index) % focusItems.length]
+  );
+  const completedFocusTaskIds =
+    focusCompletion.day === todayFocusKey ? focusCompletion.taskIds : [];
+  const completedFocusCount = focusItems.filter((item) =>
+    completedFocusTaskIds.includes(item.id)
+  ).length;
+
+  const toggleFocusTask = (taskId: string) => {
+    setFocusCompletion((current) => {
+      const currentTaskIds =
+        current.day === todayFocusKey ? current.taskIds : [];
+      return {
+        day: todayFocusKey,
+        taskIds: currentTaskIds.includes(taskId)
+          ? currentTaskIds.filter((id) => id !== taskId)
+          : [...currentTaskIds, taskId],
+      };
+    });
+  };
+
+  const resetCompletedFocusTasks = () => {
+    setFocusCompletion({ day: todayFocusKey, taskIds: [] });
+  };
 
   const saveHarvest = () => {
     if (!crop.trim() || !Number(grams)) return;
@@ -933,8 +966,8 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
       <View style={styles.focusCard}>
         <View style={styles.focusHeader}>
           <View style={styles.focusHeadingCopy}>
-            <Text style={styles.focusTag}>NO OVERWHELM • MAX 3</Text>
-            <Text style={styles.focusTitle}>🎯 Top-3 Today</Text>
+            <Text style={styles.focusTag}>TODAY ONLY • UP TO 3 TASKS</Text>
+            <Text style={styles.focusTitle}>🎯 Garden focus</Text>
           </View>
           <TouchableOpacity style={styles.resetBtn} onPress={handleCatchUpReset} activeOpacity={0.78}>
             <Ionicons name="sparkles-outline" size={14} color={WARM_THEME.accent} />
@@ -943,26 +976,94 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         </View>
 
         <Text style={styles.focusHint}>
-          Tap an item to mark it done. Life got busy? Hit Catch-Up Reset—missed tasks roll forward with zero guilt.
+          Mark a task done with its check. Use the arrow to open or run it; only three tasks are shown at a time.
         </Text>
+
+        {(focusItems.length > 3 || completedFocusCount > 0) && (
+          <View style={styles.focusControlsRow}>
+            {focusItems.length > 3 && (
+              <TouchableOpacity
+                style={styles.focusControlButton}
+                onPress={() =>
+                  setFocusRotation((current) => (current + 1) % focusItems.length)
+                }
+                activeOpacity={0.78}
+                accessibilityRole="button"
+                accessibilityLabel="Show the next three garden tasks"
+              >
+                <Ionicons name="shuffle-outline" size={14} color={WARM_THEME.accent} />
+                <Text style={styles.focusControlButtonText}>Next 3 tasks</Text>
+              </TouchableOpacity>
+            )}
+            {completedFocusCount > 0 && (
+              <TouchableOpacity
+                style={styles.focusControlButton}
+                onPress={resetCompletedFocusTasks}
+                activeOpacity={0.78}
+                accessibilityRole="button"
+                accessibilityLabel="Reset completed focus tasks"
+              >
+                <Ionicons name="refresh-outline" size={14} color={WARM_THEME.accentWarm} />
+                <Text style={styles.focusControlButtonText}>
+                  Reset completed ({completedFocusCount})
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         {topThree.length === 0 ? (
           <Text style={styles.emptyFocus}>Load your starter garden or add a plant to get gentle daily focus picks.</Text>
         ) : (
-          topThree.map((item, idx) => (
-            <TouchableOpacity key={item.id} style={styles.focusRow} onPress={item.onPress} activeOpacity={0.8}>
-              <View style={styles.focusNum}>
-                <Text style={styles.focusNumText}>{idx + 1}</Text>
-              </View>
-              <View style={styles.focusItemCopy}>
-                <Text style={styles.focusItemText}>{item.label}</Text>
-                <View style={styles.focusMetaPill}>
-                  <Text style={styles.focusMeta}>{item.meta}</Text>
+          topThree.map((item, idx) => {
+            const completed = completedFocusTaskIds.includes(item.id);
+            return (
+              <View
+                key={item.id}
+                style={[styles.focusRow, completed && styles.focusRowCompleted]}
+              >
+                <View style={styles.focusNum}>
+                  <Text style={styles.focusNumText}>{idx + 1}</Text>
                 </View>
+                <TouchableOpacity
+                  style={styles.focusCompleteToggle}
+                  onPress={() => toggleFocusTask(item.id)}
+                  activeOpacity={0.75}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: completed }}
+                  accessibilityLabel={`${completed ? 'Mark incomplete' : 'Mark complete'}: ${item.label}`}
+                >
+                  <Ionicons
+                    name={completed ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={22}
+                    color={completed ? WARM_THEME.accent : WARM_THEME.accentWarm}
+                  />
+                </TouchableOpacity>
+                <View style={styles.focusItemCopy}>
+                  <Text
+                    style={[
+                      styles.focusItemText,
+                      completed && styles.focusItemTextCompleted,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  <View style={styles.focusMetaPill}>
+                    <Text style={styles.focusMeta}>{item.meta}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.focusTaskAction}
+                  onPress={item.onPress}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open task: ${item.label}`}
+                >
+                  <Ionicons name="arrow-forward" size={16} color={WARM_THEME.accent} />
+                </TouchableOpacity>
               </View>
-              <Ionicons name="checkmark-circle-outline" size={22} color={WARM_THEME.accent} />
-            </TouchableOpacity>
-          ))
+            );
+          })
         )}
       </View>
 
@@ -1494,17 +1595,44 @@ const styles = StyleSheet.create({
   focusTag: { fontSize: 10, fontWeight: '800', color: WARM_THEME.accent, letterSpacing: 0.8 },
   focusHeadingCopy: { flex: 1, minWidth: 0, gap: 3 },
   focusTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary, marginTop: 2 },
+  focusControlsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  focusControlButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 40,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  focusControlButtonText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+    color: WARM_THEME.textPrimary,
+  },
   resetBtn: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 5,
+    minHeight: 40,
     backgroundColor: WARM_THEME.accentSoft,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 10,
   },
-  resetBtnText: { fontSize: 12, fontWeight: '700', color: WARM_THEME.accent },
+  resetBtnText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '700', color: WARM_THEME.accent },
   focusHint: { fontSize: 12, color: WARM_THEME.textSecondary, lineHeight: 17 },
   emptyFocus: { fontSize: 13, color: WARM_THEME.textSecondary, fontStyle: 'italic' },
   focusRow: {
@@ -1519,6 +1647,10 @@ const styles = StyleSheet.create({
     borderColor: WARM_THEME.border,
     ...cardShadow,
   },
+  focusRowCompleted: {
+    backgroundColor: WARM_THEME.surfaceMuted,
+    borderColor: WARM_THEME.border,
+  },
   focusNum: {
     width: 24,
     height: 24,
@@ -1528,8 +1660,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   focusNumText: { color: WARM_THEME.accentText, fontSize: 12, fontWeight: '800' },
+  focusCompleteToggle: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.accentSoft,
+  },
   focusItemCopy: { flex: 1, minWidth: 0, gap: 5 },
   focusItemText: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '700', color: WARM_THEME.textPrimary },
+  focusItemTextCompleted: { color: WARM_THEME.textSecondary },
   focusMetaPill: {
     alignSelf: 'flex-start',
     maxWidth: '100%',
@@ -1539,6 +1680,16 @@ const styles = StyleSheet.create({
     backgroundColor: WARM_THEME.accentSoft,
   },
   focusMeta: { fontSize: 10, fontWeight: '700', color: WARM_THEME.accent },
+  focusTaskAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+  },
   pantryCard: {
     backgroundColor: WARM_THEME.surface,
     borderRadius: WARM_THEME.radiusCard,
