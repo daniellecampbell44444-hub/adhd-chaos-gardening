@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share } from 'react-native';
 import { AdminConsoleScreen } from '../../components/AdminConsoleScreen';
+import { SubscriptionScreen } from '../../components/SubscriptionScreen';
 import { WarmBannerCard } from '../../components/WarmBannerCard';
 import { useGarden } from '../../context/GardenContext';
 import { useAdminAccess } from '../../utils/adminAccess';
@@ -534,6 +535,7 @@ export default function PulseScreen() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [modal, setModal] = useState<'none' | 'harvest' | 'expense' | 'auth'>('none');
+  const [showSubscription, setShowSubscription] = useState(false);
   const [crop, setCrop] = useState('');
 const HARVEST_PLANT_CHIPS = Array.from(new Set(plants.map(p => (p.variety ? `${p.variety} ${p.name}` : p.name).trim()))).filter(Boolean).slice(0, 12);
   const [grams, setGrams] = useState('');
@@ -739,22 +741,35 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
     Alert.alert('Fresh slate!', `${openReminders.length} open task(s) rolled smoothly into today with zero guilt.`);
   };
 
+  if (showSubscription) {
+    return <SubscriptionScreen onClose={() => setShowSubscription(false)} />;
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
         <View style={styles.heroTop}>
-          <View style={{ flex: 1, minWidth: 170 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.heroTag}>WESTERN SYDNEY • LIVE</Text>
             <Text style={styles.heroTitle}>ADHD Chaos Gardening</Text>
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          <View style={styles.heroActions}>
             <TouchableOpacity onPress={() => setModal('auth')} style={styles.cloudBtn}>
               <Ionicons name={user ? 'cloud-done' : 'cloud-outline'} size={16} color={WARM_THEME.accent} />
               <Text style={styles.cloudTxt}>{syncLabel}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn}>
               <Ionicons name="refresh" size={16} color={WARM_THEME.accent} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setShowSubscription(true)}
+              style={styles.proButton}
+              accessibilityRole="button"
+              accessibilityLabel="Open Pro subscription options"
+            >
+              <Ionicons name="sparkles" size={15} color={WARM_THEME.accentText} />
+              <Text style={styles.proButtonText}>Pro / Subscription</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1078,6 +1093,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 8,
   },
+  heroActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
   heroTag: { color: WARM_THEME.accentWarm, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   heroTitle: { color: WARM_THEME.textPrimary, fontSize: 21, fontWeight: '800', marginTop: 3 },
   heroSub: { color: WARM_THEME.textSecondary, fontSize: 13, marginTop: 8 },
@@ -1099,6 +1120,24 @@ const styles = StyleSheet.create({
     borderColor: WARM_THEME.border,
     padding: 7,
     borderRadius: 10,
+  },
+  proButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '100%',
+    backgroundColor: WARM_THEME.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: WARM_THEME.radiusPill,
+  },
+  proButtonText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '800',
+    color: WARM_THEME.accentText,
   },
   weatherLoading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 10 },
   weatherBox: {

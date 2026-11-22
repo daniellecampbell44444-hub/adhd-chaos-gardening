@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   View,
@@ -12,6 +12,7 @@ import * as ImagePicker from "expo-image-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WarmBannerCard } from "./WarmBannerCard";
 import { WARM_THEME } from "../utils/warmTheme";
+import { PLANT_LIBRARY, useGarden } from "../context/GardenContext";
 import {
   APP_COLOR_PRESETS,
   DEFAULT_ADMIN_VISUALS,
@@ -21,6 +22,7 @@ import {
   saveAdminVisuals,
 } from "../utils/adminCustomization";
 import type { AdminVisualSettings } from "../utils/adminCustomization";
+import { getTypeaheadPlantOptions } from "../utils/plantSearch";
 
 export interface AdminStagedItem {
   id: string;
@@ -50,17 +52,73 @@ export function AdminConsoleScreen({
   onStageItem,
   onVisualsChange,
 }: AdminConsoleScreenProps) {
+  const { plants, seeds } = useGarden();
   const [passcodeInput, setPasscodeInput] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"catalog" | "swap" | "app">("catalog");
 
   const [itemName, setItemName] = useState("");
+  const [showPlantSuggestions, setShowPlantSuggestions] = useState(false);
   const [itemKind, setItemKind] = useState<"Seed" | "Plant" | "Garden Item">("Seed");
   const [seedPostage, setSeedPostage] = useState(true);
   const [stagedItems, setStagedItems] = useState<AdminStagedItem[]>([]);
   const [visualSettings, setVisualSettings] =
     useState<AdminVisualSettings>(DEFAULT_ADMIN_VISUALS);
   const [savingVisualSettings, setSavingVisualSettings] = useState(false);
+  const plantSearchSources = useMemo(() => {
+    const sourcesByName = new Map<
+      string,
+      { id: string; name: string; category?: string; varieties: Set<string> }
+    >();
+
+    const addSource = (
+      id: string,
+      name: string,
+      category?: string,
+      variety?: string
+    ) => {
+      const trimmedName = name.trim();
+      if (!trimmedName) return;
+
+      const key = trimmedName.toLowerCase();
+      let source = sourcesByName.get(key);
+      if (!source) {
+        source = {
+          id,
+          name: trimmedName,
+          category,
+          varieties: new Set<string>(),
+        };
+        sourcesByName.set(key, source);
+      } else if (!source.category && category) {
+        source.category = category;
+      }
+
+      const trimmedVariety = variety?.trim();
+      if (trimmedVariety && trimmedVariety.toLowerCase() !== "standard") {
+        source.varieties.add(trimmedVariety);
+      }
+    };
+
+    PLANT_LIBRARY.forEach((plant) =>
+      addSource(plant.id, plant.name, plant.category)
+    );
+    plants.forEach((plant) =>
+      addSource(plant.id, plant.name, plant.category, plant.variety)
+    );
+    seeds.forEach((seed) =>
+      addSource(seed.id, seed.name, undefined, seed.variety)
+    );
+
+    return Array.from(sourcesByName.values(), (source) => ({
+      ...source,
+      varieties: Array.from(source.varieties),
+    }));
+  }, [plants, seeds]);
+  const plantSuggestions = useMemo(
+    () => getTypeaheadPlantOptions(itemName, plantSearchSources),
+    [itemName, plantSearchSources]
+  );
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -217,6 +275,7 @@ export function AdminConsoleScreen({
     setStagedItems((prev) => [created, ...prev]);
     onStageItem?.(created);
     setItemName("");
+    setShowPlantSuggestions(false);
     setStatusMessage(
       `Added "${trimmed}" (${itemKind}) — Postage: ${
         effectivePostageAllowed ? "Allowed (Seed)" : "Disabled"
@@ -278,11 +337,57 @@ export function AdminConsoleScreen({
             <Text style={styles.cardTitle}>Add Seed, Plant, or Garden Item</Text>
             <TextInput
               value={itemName}
-              onChangeText={setItemName}
+              onChangeText={(value) => {
+                setItemName(value);
+                setShowPlantSuggestions(
+                  itemKind === "Plant" && value.trim().length > 0
+                );
+              }}
+              onFocus={() => {
+                if (itemKind === "Plant" && itemName.trim()) {
+                  setShowPlantSuggestions(true);
+                }
+              }}
               placeholder="e.g. Black Krim Tomato or Dwarf Eureka Lemon"
               placeholderTextColor={WARM_THEME.textSecondary}
               style={styles.input}
             />
+
+            {itemKind === "Plant" &&
+              showPlantSuggestions &&
+              itemName.trim().length > 0 && (
+                <View style={styles.suggestionList}>
+                  {plantSuggestions.length > 0 ? (
+                    plantSuggestions.map((suggestion) => (
+                      <TouchableOpacity
+                        key={suggestion.id}
+                        style={styles.suggestionRow}
+                        onPress={() => {
+                          setItemName(
+                            suggestion.varietyName
+                              ? `${suggestion.varietyName} ${suggestion.plantName}`
+                              : suggestion.plantName
+                          );
+                          setShowPlantSuggestions(false);
+                        }}
+                      >
+                        <Text style={styles.suggestionLabel}>
+                          {suggestion.label}
+                        </Text>
+                        {suggestion.subtitle && (
+                          <Text style={styles.suggestionSubtitle}>
+                            {suggestion.subtitle}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.suggestionEmpty}>
+                      No matching plants or varieties. You can still add the name as entered.
+                    </Text>
+                  )}
+                </View>
+              )}
 
             <View style={styles.wrapRow}>
               {(["Seed", "Plant", "Garden Item"] as const).map((kind) => {
@@ -293,6 +398,9 @@ export function AdminConsoleScreen({
                     style={[styles.pill, selected && styles.pillActive]}
                     onPress={() => {
                       setItemKind(kind);
+                      setShowPlantSuggestions(
+                        kind === "Plant" && itemName.trim().length > 0
+                      );
                       if (kind !== "Seed") setSeedPostage(false);
                     }}
                   >
@@ -650,6 +758,36 @@ const styles = StyleSheet.create({
     color: WARM_THEME.textPrimary,
   },
   helperText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: WARM_THEME.textSecondary,
+  },
+  suggestionList: {
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    borderRadius: 12,
+    backgroundColor: WARM_THEME.surface,
+    overflow: "hidden",
+  },
+  suggestionRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: WARM_THEME.border,
+  },
+  suggestionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: WARM_THEME.textPrimary,
+  },
+  suggestionSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    color: WARM_THEME.textSecondary,
+  },
+  suggestionEmpty: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     fontSize: 12,
     lineHeight: 17,
     color: WARM_THEME.textSecondary,
