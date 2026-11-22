@@ -379,6 +379,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const skipNextPush = useRef(false);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     AsyncStorage.getItem(STORAGE_KEY).then(raw => {
       if (raw) {
         try {
@@ -403,6 +405,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
     });
@@ -413,7 +417,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!loaded || !user) {
+    if (typeof window === 'undefined' || !loaded || !user) {
       setSyncStatus('local');
       return;
     }
@@ -472,7 +476,8 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   }, [user, loaded]);
 
   useEffect(() => {
-    if (!loaded) return;
+    if (typeof window === 'undefined' || !loaded) return;
+
     const payload = { plants, batchCareLogs, harvestKitchenLogs, unifiedGardenLogs, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, preservationBatches, weatherMode };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
