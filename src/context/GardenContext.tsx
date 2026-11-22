@@ -13,6 +13,7 @@ export type PropagationStatus = 'Callusing / Rooting' | 'Roots Forming' | 'Ready
 export type SoilCareType = 'Soil Mix' | 'Mulch Top-Up' | 'Compost / Worm Castings' | 'pH / Soil Amendment';
 export type ScratchpadTag = 'Pest / Leaf' | 'Water / Sun' | 'Harvest / Kitchen' | 'Idea / To-Do';
 export type PreservationMethod = 'Dehydrating' | 'Canning' | 'Pickling' | 'Freezing / Jam';
+export type BatchCareAction = 'Watered' | 'Fed';
 
 export interface LibraryPlant {
   id: string; name: string; scientific: string; category: Category;
@@ -23,6 +24,11 @@ export interface Plant {
   id: string; name: string; variety: string; scientific: string; category: Category;
   quantity: number; site: string; stage: Stage; potSize: string; idealTemp: string;
   waterEveryDays: number; lastWatered?: string; lastFed?: string;
+}
+export interface BatchCareLog {
+  site: string;
+  action: BatchCareAction;
+  loggedAt: string;
 }
 export interface Fertilizer {
   id: string; brand: string; name: string; feedType: 'Liquid' | 'Granular' | 'Organic' | 'Potash Boost';
@@ -276,6 +282,9 @@ interface GardenContextType {
   feedPlant: (id: string) => void;
   waterAll: () => void;
   feedAll: () => void;
+  batchCareLogs: BatchCareLog[];
+  logBatchCare: (site: string, action: BatchCareAction) => number;
+  clearBatchCareLogs: () => void;
   addFertilizer: (f: Omit<Fertilizer, 'id'>) => void;
   deleteFertilizer: (id: string) => void;
   addSeed: (s: Omit<SeedItem, 'id'>) => void;
@@ -310,6 +319,7 @@ const STORAGE_KEY = 'adhd_chaos_gardening_v1';
 
 export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [batchCareLogs, setBatchCareLogs] = useState<BatchCareLog[]>([]);
   const [fertilizers, setFertilizers] = useState<Fertilizer[]>([]);
   const [seeds, setSeeds] = useState<SeedItem[]>([]);
   const [propagations, setPropagations] = useState<PropagationItem[]>([]);
@@ -333,6 +343,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         try {
           const d = JSON.parse(raw);
           setPlants(d.plants || []);
+          setBatchCareLogs(d.batchCareLogs || []);
           setFertilizers(d.fertilizers || []);
           setSeeds(d.seeds || []);
           setPropagations(d.propagations || []);
@@ -386,10 +397,12 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           (cloud.propagations?.length || 0) > 0 ||
           (cloud.soilLogs?.length || 0) > 0 ||
           (cloud.harvests?.length || 0) > 0 ||
-          (cloud.scratchpadNotes?.length || 0) > 0);
+          (cloud.scratchpadNotes?.length || 0) > 0 ||
+          (cloud.batchCareLogs?.length || 0) > 0);
       if (hasCloudData) {
         skipNextPush.current = true;
         setPlants(cloud.plants || []);
+        setBatchCareLogs(cloud.batchCareLogs || []);
         setFertilizers(cloud.fertilizers || []);
         setSeeds(cloud.seeds || []);
         setPropagations(cloud.propagations || []);
@@ -413,7 +426,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return;
-    const payload = { plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, preservationBatches, weatherMode };
+    const payload = { plants, batchCareLogs, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, preservationBatches, weatherMode };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
     if (!user) return;
@@ -431,7 +444,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [plants, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode, loaded, user]);
+  }, [plants, batchCareLogs, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode, loaded, user]);
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email: email.trim(), password });
@@ -481,6 +494,35 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
   const waterAll = () => setPlants(prev => prev.map(p => ({ ...p, lastWatered: today() })));
   const feedAll = () =>
     setPlants(prev => prev.map(p => (p.stage === 'Dormant' ? p : { ...p, lastFed: today() })));
+  const logBatchCare = (site: string, action: BatchCareAction) => {
+    const normalizedSite = site.trim().toLowerCase();
+    if (!normalizedSite) return 0;
+    const eligiblePlants = plants.filter(
+      p =>
+        p.site.trim().toLowerCase() === normalizedSite &&
+        (action === 'Watered' || p.stage !== 'Dormant')
+    );
+    if (eligiblePlants.length === 0) return 0;
+
+    const loggedAt = new Date().toISOString();
+    setPlants(prev =>
+      prev.map(p => {
+        const isEligible =
+          p.site.trim().toLowerCase() === normalizedSite &&
+          (action === 'Watered' || p.stage !== 'Dormant');
+        if (!isEligible) return p;
+        return action === 'Watered'
+          ? { ...p, lastWatered: today() }
+          : { ...p, lastFed: today() };
+      })
+    );
+    setBatchCareLogs(prev => [
+      { site: eligiblePlants[0].site, action, loggedAt },
+      ...prev.filter(log => log.site.trim().toLowerCase() !== normalizedSite),
+    ].slice(0, 20));
+    return eligiblePlants.length;
+  };
+  const clearBatchCareLogs = () => setBatchCareLogs([]);
 
   const addFertilizer = (f: Omit<Fertilizer, 'id'>) =>
     setFertilizers(prev => [{ ...f, id: uid() }, ...prev]);
@@ -725,6 +767,9 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         feedPlant,
         waterAll,
         feedAll,
+        batchCareLogs,
+        logBatchCare,
+        clearBatchCareLogs,
         addFertilizer,
         deleteFertilizer,
         addSeed,

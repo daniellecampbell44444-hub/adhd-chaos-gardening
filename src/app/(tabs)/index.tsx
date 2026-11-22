@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInpu
 import { AdminConsoleScreen } from '../../components/AdminConsoleScreen';
 import { SubscriptionScreen } from '../../components/SubscriptionScreen';
 import { WarmBannerCard } from '../../components/WarmBannerCard';
-import { useGarden } from '../../context/GardenContext';
+import { useGarden, type BatchCareAction } from '../../context/GardenContext';
 import { useAdminAccess } from '../../utils/adminAccess';
 import { WARM_THEME } from '../../utils/warmTheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,6 +36,17 @@ function describeWeather(code: number) {
   if (code <= 82) return { icon: '🌦️', label: 'Showers' };
   if (code >= 95) return { icon: '⛈️', label: 'Storms' };
   return { icon: '🌤️', label: 'Mild' };
+}
+
+function formatBatchCareTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Time unavailable';
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 function getPreservationIdea(cropName: string, grams: number): string {
@@ -530,7 +541,7 @@ export default function PulseScreen() {
   const {
     plants, harvests, expenses, reminders, seeds, user, syncStatus,
     signUp, signIn, signOut, waterAll, feedAll, addHarvest, deleteHarvest, clearAllHarvests, addExpense,
-    toggleReminder, catchUpReminders, loadSampleGarden,
+    toggleReminder, catchUpReminders, loadSampleGarden, batchCareLogs, logBatchCare, clearBatchCareLogs,
   } = useGarden();
 
   const {
@@ -550,6 +561,8 @@ export default function PulseScreen() {
     taskIds: string[];
   }>({ day: todayFocusKey, taskIds: [] });
   const [focusRotation, setFocusRotation] = useState(0);
+  const [selectedBatchZone, setSelectedBatchZone] = useState('');
+  const [batchCareFeedback, setBatchCareFeedback] = useState('');
   const [crop, setCrop] = useState('');
 const HARVEST_PLANT_CHIPS = Array.from(new Set(plants.map(p => (p.variety ? `${p.variety} ${p.name}` : p.name).trim()))).filter(Boolean).slice(0, 12);
   const [grams, setGrams] = useState('');
@@ -668,6 +681,60 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
   const highRain = weather ? Math.max(weather.todayRain, weather.tomorrowRain) : 0;
   const wInfo = weather ? describeWeather(weather.code) : null;
   const syncLabel = !user ? 'Cloud Backup' : syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'error' ? 'Sync Error' : 'Synced ✓';
+  const batchZones = Array.from(
+    new Map(
+      plants
+        .map(plant => plant.site.trim())
+        .filter(Boolean)
+        .map(site => [site.toLowerCase(), site])
+    ).values()
+  );
+  const activeBatchZone = batchZones.includes(selectedBatchZone)
+    ? selectedBatchZone
+    : batchZones[0] ?? '';
+  const activeBatchZonePlants = activeBatchZone
+    ? plants.filter(
+        plant => plant.site.trim().toLowerCase() === activeBatchZone.toLowerCase()
+      )
+    : [];
+  const canFeedSelectedBatchZone = activeBatchZonePlants.some(
+    plant => plant.stage !== 'Dormant'
+  );
+  const latestBatchLogByZone = new Map(
+    batchCareLogs.map(log => [log.site.trim().toLowerCase(), log])
+  );
+
+  const handleBatchCareLog = (action: BatchCareAction) => {
+    if (!activeBatchZone) return;
+    const updatedCount = logBatchCare(activeBatchZone, action);
+    if (updatedCount === 0) {
+      setBatchCareFeedback(`No eligible plants in ${activeBatchZone} to log.`);
+      return;
+    }
+    setBatchCareFeedback(
+      `${activeBatchZone}: ${action.toLowerCase()} logged for ${updatedCount} plant ${
+        updatedCount === 1 ? 'entry' : 'entries'
+      }.`
+    );
+  };
+
+  const confirmClearBatchCareLogs = () => {
+    Alert.alert(
+      'Clear recent batch log?',
+      'This clears the batch history only. Plant care records will stay unchanged.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear log',
+          style: 'destructive',
+          onPress: () => {
+            clearBatchCareLogs();
+            setBatchCareFeedback('Recent batch history cleared.');
+          },
+        },
+      ]
+    );
+  };
 
   // Surplus harvests (>= 400g) that can be preserved or turned into kitchen staples
   const surplusHarvests = harvests
@@ -1064,6 +1131,172 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
               </View>
             );
           })
+        )}
+      </View>
+
+      <View style={styles.batchZoneCard}>
+        <View style={styles.batchZoneHeader}>
+          <View style={styles.batchZoneHeaderCopy}>
+            <Text style={styles.batchZoneEyebrow}>QUICK BATCH LOG</Text>
+            <Text style={styles.batchZoneTitle}>Water or feed a zone</Text>
+          </View>
+          <Ionicons name="water-outline" size={22} color={WARM_THEME.accentWarm} />
+        </View>
+        <Text style={styles.batchZoneDescription}>
+          Pick a bed, row, or pot zone to update its plants together. Feeding skips dormant plants.
+        </Text>
+
+        {batchZones.length > 0 ? (
+          <View style={styles.batchZonePills}>
+            {batchZones.map(zone => {
+              const isSelected = zone === activeBatchZone;
+              return (
+                <TouchableOpacity
+                  key={zone}
+                  style={[
+                    styles.batchZonePill,
+                    isSelected && styles.batchZonePillSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedBatchZone(zone);
+                    setBatchCareFeedback('');
+                  }}
+                  activeOpacity={0.76}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`Select ${zone} zone`}
+                >
+                  <Text
+                    style={[
+                      styles.batchZonePillText,
+                      isSelected && styles.batchZonePillTextSelected,
+                    ]}
+                  >
+                    {zone}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <View style={styles.batchZoneEmpty}>
+            <Text style={styles.batchZoneEmptyText}>
+              Add a plant and give it a bed or pot zone to start a batch log.
+            </Text>
+          </View>
+        )}
+
+        {activeBatchZone ? (
+          <Text style={styles.batchZoneCount}>
+            {activeBatchZonePlants.length} plant{' '}
+            {activeBatchZonePlants.length === 1 ? 'entry' : 'entries'} in {activeBatchZone}
+          </Text>
+        ) : null}
+
+        <View style={styles.batchZoneActions}>
+          <TouchableOpacity
+            style={[
+              styles.batchZoneActionButton,
+              styles.batchWaterButton,
+              !activeBatchZone && styles.batchZoneActionDisabled,
+            ]}
+            onPress={() => handleBatchCareLog('Watered')}
+            activeOpacity={0.78}
+            disabled={!activeBatchZone}
+            accessibilityRole="button"
+            accessibilityLabel={`Log watered for ${activeBatchZone || 'selected zone'}`}
+          >
+            <Ionicons
+              name="water"
+              size={17}
+              color={activeBatchZone ? WARM_THEME.accentText : WARM_THEME.textSecondary}
+            />
+            <Text
+              style={[
+                styles.batchWaterButtonText,
+                !activeBatchZone && styles.batchZoneActionDisabledText,
+              ]}
+            >
+              Log Watered
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.batchZoneActionButton,
+              styles.batchFeedButton,
+              !canFeedSelectedBatchZone && styles.batchZoneActionDisabled,
+            ]}
+            onPress={() => handleBatchCareLog('Fed')}
+            activeOpacity={0.78}
+            disabled={!canFeedSelectedBatchZone}
+            accessibilityRole="button"
+            accessibilityLabel={`Log fed for ${activeBatchZone || 'selected zone'}`}
+          >
+            <Ionicons
+              name="leaf-outline"
+              size={17}
+              color={canFeedSelectedBatchZone ? WARM_THEME.accentText : WARM_THEME.textSecondary}
+            />
+            <Text
+              style={[
+                styles.batchFeedButtonText,
+                !canFeedSelectedBatchZone && styles.batchZoneActionDisabledText,
+              ]}
+            >
+              Log Fed
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {activeBatchZone && !canFeedSelectedBatchZone ? (
+          <Text style={styles.batchZoneDisabledNote}>
+            Feeding is unavailable because all plants in this zone are dormant.
+          </Text>
+        ) : null}
+        {batchCareFeedback ? (
+          <Text style={styles.batchCareFeedback} accessibilityRole="text">
+            {batchCareFeedback}
+          </Text>
+        ) : null}
+
+        <View style={styles.batchRecentHeader}>
+          <Text style={styles.batchRecentTitle}>Recent by zone</Text>
+          {batchCareLogs.length > 0 && (
+            <TouchableOpacity
+              style={styles.batchClearButton}
+              onPress={confirmClearBatchCareLogs}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Clear recent batch log"
+            >
+              <Text style={styles.batchClearButtonText}>Clear log</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {batchZones.length > 0 ? (
+          <View style={styles.batchRecentList}>
+            {batchZones.map(zone => {
+              const entry = latestBatchLogByZone.get(zone.toLowerCase());
+              return (
+                <View key={zone} style={styles.batchRecentRow}>
+                  <View style={styles.batchRecentZoneBadge}>
+                    <Ionicons name="location-outline" size={14} color={WARM_THEME.accent} />
+                  </View>
+                  <View style={styles.batchRecentCopy}>
+                    <Text style={styles.batchRecentZone}>{zone}</Text>
+                    <Text style={styles.batchRecentDetails}>
+                      {entry
+                        ? `${entry.action} • ${formatBatchCareTime(entry.loggedAt)}`
+                        : 'No batch log yet'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : (
+          <Text style={styles.batchNoHistory}>
+            Your latest batch action for each zone will show here.
+          </Text>
         )}
       </View>
 
@@ -1690,6 +1923,192 @@ const styles = StyleSheet.create({
     borderColor: WARM_THEME.border,
     backgroundColor: WARM_THEME.surface,
   },
+  batchZoneCard: {
+    gap: 12,
+    padding: 16,
+    borderRadius: WARM_THEME.radiusCard,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+    ...cardShadow,
+  },
+  batchZoneHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  batchZoneHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
+  batchZoneEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: WARM_THEME.accentWarm,
+  },
+  batchZoneTitle: { fontSize: 17, fontWeight: '800', color: WARM_THEME.textPrimary },
+  batchZoneDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: WARM_THEME.textSecondary,
+  },
+  batchZonePills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  batchZonePill: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    maxWidth: '100%',
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  batchZonePillSelected: {
+    borderColor: WARM_THEME.accent,
+    backgroundColor: WARM_THEME.accent,
+  },
+  batchZonePillText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '700',
+    color: WARM_THEME.textPrimary,
+  },
+  batchZonePillTextSelected: { color: WARM_THEME.accentText },
+  batchZoneEmpty: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+  },
+  batchZoneEmptyText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    lineHeight: 17,
+    color: WARM_THEME.textSecondary,
+  },
+  batchZoneCount: { fontSize: 11, fontWeight: '700', color: WARM_THEME.textSecondary },
+  batchZoneActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  batchZoneActionButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    flexGrow: 1,
+    flexBasis: 110,
+    minWidth: 110,
+    minHeight: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  batchWaterButton: { backgroundColor: WARM_THEME.accent },
+  batchFeedButton: { backgroundColor: WARM_THEME.accentWarm },
+  batchZoneActionDisabled: { backgroundColor: WARM_THEME.surfaceMuted },
+  batchZoneActionDisabledText: { color: WARM_THEME.textSecondary },
+  batchZoneDisabledNote: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: WARM_THEME.textSecondary,
+  },
+  batchWaterButtonText: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '800',
+    color: WARM_THEME.accentText,
+  },
+  batchFeedButtonText: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '800',
+    color: WARM_THEME.accentText,
+  },
+  batchCareFeedback: {
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
+    color: WARM_THEME.accent,
+  },
+  batchRecentHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 2,
+  },
+  batchRecentTitle: { fontSize: 12, fontWeight: '800', color: WARM_THEME.textPrimary },
+  batchClearButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  batchClearButtonText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+    color: WARM_THEME.accent,
+  },
+  batchRecentList: { gap: 7 },
+  batchRecentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 9,
+    padding: 9,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+  },
+  batchRecentZoneBadge: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.accentSoft,
+  },
+  batchRecentCopy: { flex: 1, minWidth: 0, gap: 2 },
+  batchRecentZone: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  batchRecentDetails: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    lineHeight: 14,
+    color: WARM_THEME.textSecondary,
+  },
+  batchNoHistory: { fontSize: 11, color: WARM_THEME.textSecondary },
   pantryCard: {
     backgroundColor: WARM_THEME.surface,
     borderRadius: WARM_THEME.radiusCard,
