@@ -14,6 +14,7 @@ export type SoilCareType = 'Soil Mix' | 'Mulch Top-Up' | 'Compost / Worm Casting
 export type ScratchpadTag = 'Pest / Leaf' | 'Water / Sun' | 'Harvest / Kitchen' | 'Idea / To-Do';
 export type PreservationMethod = 'Dehydrating' | 'Canning' | 'Pickling' | 'Freezing / Jam';
 export type BatchCareAction = 'Watered' | 'Fed';
+export type KitchenLogOutcome = 'Fresh' | 'Dehydrated' | 'Pickled' | 'Canned' | 'Batch';
 
 export interface LibraryPlant {
   id: string; name: string; scientific: string; category: Category;
@@ -61,6 +62,14 @@ export interface SoilLogItem {
   notes?: string;
 }
 export interface HarvestLog { id: string; crop: string; grams: number; valueAud: number; date: string; }
+export interface HarvestKitchenLog {
+  id: string;
+  item: string;
+  outcome: KitchenLogOutcome;
+  loggedAt: string;
+  quantity?: string;
+  notes?: string;
+}
 export interface ExpenseLog { id: string; item: string; category: string; costAud: number; date: string; }
 export interface Reminder { id: string; title: string; due: string; done: boolean; }
 export interface ScratchpadNote {
@@ -285,6 +294,15 @@ interface GardenContextType {
   batchCareLogs: BatchCareLog[];
   logBatchCare: (site: string, action: BatchCareAction) => number;
   clearBatchCareLogs: () => void;
+  harvestKitchenLogs: HarvestKitchenLog[];
+  addHarvestKitchenLog: (
+    item: string,
+    outcome: KitchenLogOutcome,
+    quantity?: string,
+    notes?: string
+  ) => void;
+  deleteHarvestKitchenLog: (id: string) => void;
+  clearHarvestKitchenLogs: () => void;
   addFertilizer: (f: Omit<Fertilizer, 'id'>) => void;
   deleteFertilizer: (id: string) => void;
   addSeed: (s: Omit<SeedItem, 'id'>) => void;
@@ -320,6 +338,7 @@ const STORAGE_KEY = 'adhd_chaos_gardening_v1';
 export function GardenProvider({ children }: { children: React.ReactNode }) {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [batchCareLogs, setBatchCareLogs] = useState<BatchCareLog[]>([]);
+  const [harvestKitchenLogs, setHarvestKitchenLogs] = useState<HarvestKitchenLog[]>([]);
   const [fertilizers, setFertilizers] = useState<Fertilizer[]>([]);
   const [seeds, setSeeds] = useState<SeedItem[]>([]);
   const [propagations, setPropagations] = useState<PropagationItem[]>([]);
@@ -344,6 +363,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           const d = JSON.parse(raw);
           setPlants(d.plants || []);
           setBatchCareLogs(d.batchCareLogs || []);
+          setHarvestKitchenLogs(d.harvestKitchenLogs || []);
           setFertilizers(d.fertilizers || []);
           setSeeds(d.seeds || []);
           setPropagations(d.propagations || []);
@@ -398,11 +418,13 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
           (cloud.soilLogs?.length || 0) > 0 ||
           (cloud.harvests?.length || 0) > 0 ||
           (cloud.scratchpadNotes?.length || 0) > 0 ||
-          (cloud.batchCareLogs?.length || 0) > 0);
+          (cloud.batchCareLogs?.length || 0) > 0 ||
+          (cloud.harvestKitchenLogs?.length || 0) > 0);
       if (hasCloudData) {
         skipNextPush.current = true;
         setPlants(cloud.plants || []);
         setBatchCareLogs(cloud.batchCareLogs || []);
+        setHarvestKitchenLogs(cloud.harvestKitchenLogs || []);
         setFertilizers(cloud.fertilizers || []);
         setSeeds(cloud.seeds || []);
         setPropagations(cloud.propagations || []);
@@ -426,7 +448,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loaded) return;
-    const payload = { plants, batchCareLogs, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, preservationBatches, weatherMode };
+    const payload = { plants, batchCareLogs, harvestKitchenLogs, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, preservationBatches, weatherMode };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 
     if (!user) return;
@@ -444,7 +466,7 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [plants, batchCareLogs, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode, loaded, user]);
+  }, [plants, batchCareLogs, harvestKitchenLogs, fertilizers, seeds, propagations, soilLogs, harvests, expenses, reminders, scratchpadNotes, weatherMode, loaded, user]);
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email: email.trim(), password });
@@ -614,6 +636,31 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     const est = valueAud ?? Number(((grams / 1000) * (m?.audPerKg || 8)).toFixed(2));
     setHarvests(prev => [{ id: uid(), crop, grams, valueAud: est, date: today() }, ...prev]);
   };
+  const addHarvestKitchenLog = (
+    item: string,
+    outcome: KitchenLogOutcome,
+    quantity?: string,
+    notes?: string
+  ) => {
+    const cleanItem = item.trim();
+    if (!cleanItem) return;
+    const cleanQuantity = quantity?.trim();
+    const cleanNotes = notes?.trim();
+    setHarvestKitchenLogs(prev => [
+      {
+        id: uid(),
+        item: cleanItem,
+        outcome,
+        loggedAt: new Date().toISOString(),
+        ...(cleanQuantity ? { quantity: cleanQuantity } : {}),
+        ...(cleanNotes ? { notes: cleanNotes } : {}),
+      },
+      ...prev,
+    ]);
+  };
+  const deleteHarvestKitchenLog = (id: string) =>
+    setHarvestKitchenLogs(prev => prev.filter(entry => entry.id !== id));
+  const clearHarvestKitchenLogs = () => setHarvestKitchenLogs([]);
   const addExpense = (item: string, category: string, costAud: number) =>
     setExpenses(prev => [{ id: uid(), item, category, costAud, date: today() }, ...prev]);
   const addReminder = (title: string, due: string) =>
@@ -770,6 +817,10 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
         batchCareLogs,
         logBatchCare,
         clearBatchCareLogs,
+        harvestKitchenLogs,
+        addHarvestKitchenLog,
+        deleteHarvestKitchenLog,
+        clearHarvestKitchenLogs,
         addFertilizer,
         deleteFertilizer,
         addSeed,

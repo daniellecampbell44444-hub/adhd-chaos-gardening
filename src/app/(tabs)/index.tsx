@@ -5,7 +5,11 @@ import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInpu
 import { AdminConsoleScreen } from '../../components/AdminConsoleScreen';
 import { SubscriptionScreen } from '../../components/SubscriptionScreen';
 import { WarmBannerCard } from '../../components/WarmBannerCard';
-import { useGarden, type BatchCareAction } from '../../context/GardenContext';
+import {
+  useGarden,
+  type BatchCareAction,
+  type KitchenLogOutcome,
+} from '../../context/GardenContext';
 import { useAdminAccess } from '../../utils/adminAccess';
 import { WARM_THEME } from '../../utils/warmTheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +31,13 @@ interface WeatherData {
 const WEATHER_URL =
   'https://api.open-meteo.com/v1/forecast?latitude=-33.765&longitude=150.870&current=temperature_2m,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Australia%2FSydney&forecast_days=2';
 const expectedAdminPasscode = process.env.EXPO_PUBLIC_ADMIN_DEV_PASSCODE;
+const KITCHEN_OUTCOMES: KitchenLogOutcome[] = [
+  'Fresh',
+  'Dehydrated',
+  'Pickled',
+  'Canned',
+  'Batch',
+];
 
 function describeWeather(code: number) {
   if (code === 0) return { icon: '☀️', label: 'Clear skies' };
@@ -38,7 +49,7 @@ function describeWeather(code: number) {
   return { icon: '🌤️', label: 'Mild' };
 }
 
-function formatBatchCareTime(value: string) {
+function formatLocalLogTimestamp(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Time unavailable';
   return date.toLocaleString([], {
@@ -542,6 +553,7 @@ export default function PulseScreen() {
     plants, harvests, expenses, reminders, seeds, user, syncStatus,
     signUp, signIn, signOut, waterAll, feedAll, addHarvest, deleteHarvest, clearAllHarvests, addExpense,
     toggleReminder, catchUpReminders, loadSampleGarden, batchCareLogs, logBatchCare, clearBatchCareLogs,
+    harvestKitchenLogs, addHarvestKitchenLog, deleteHarvestKitchenLog, clearHarvestKitchenLogs,
   } = useGarden();
 
   const {
@@ -563,6 +575,10 @@ export default function PulseScreen() {
   const [focusRotation, setFocusRotation] = useState(0);
   const [selectedBatchZone, setSelectedBatchZone] = useState('');
   const [batchCareFeedback, setBatchCareFeedback] = useState('');
+  const [kitchenItem, setKitchenItem] = useState('');
+  const [kitchenQuantity, setKitchenQuantity] = useState('');
+  const [kitchenNotes, setKitchenNotes] = useState('');
+  const [kitchenOutcome, setKitchenOutcome] = useState<KitchenLogOutcome>('Fresh');
   const [crop, setCrop] = useState('');
 const HARVEST_PLANT_CHIPS = Array.from(new Set(plants.map(p => (p.variety ? `${p.variety} ${p.name}` : p.name).trim()))).filter(Boolean).slice(0, 12);
   const [grams, setGrams] = useState('');
@@ -830,6 +846,30 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
     setCrop('');
     setGrams('');
     setModal('none');
+  };
+
+  const saveKitchenLog = () => {
+    const item = kitchenItem.trim();
+    if (!item) return;
+    addHarvestKitchenLog(item, kitchenOutcome, kitchenQuantity, kitchenNotes);
+    setKitchenItem('');
+    setKitchenQuantity('');
+    setKitchenNotes('');
+  };
+
+  const confirmClearKitchenLogs = () => {
+    Alert.alert(
+      'Clear harvest & kitchen log?',
+      'This removes all kitchen log entries.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear log',
+          style: 'destructive',
+          onPress: clearHarvestKitchenLogs,
+        },
+      ]
+    );
   };
 
   const saveExpense = () => {
@@ -1285,7 +1325,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
                     <Text style={styles.batchRecentZone}>{zone}</Text>
                     <Text style={styles.batchRecentDetails}>
                       {entry
-                        ? `${entry.action} • ${formatBatchCareTime(entry.loggedAt)}`
+                        ? `${entry.action} • ${formatLocalLogTimestamp(entry.loggedAt)}`
                         : 'No batch log yet'}
                     </Text>
                   </View>
@@ -1297,6 +1337,160 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           <Text style={styles.batchNoHistory}>
             Your latest batch action for each zone will show here.
           </Text>
+        )}
+      </View>
+
+      <View style={styles.kitchenCard}>
+        <View style={styles.kitchenHeader}>
+          <View style={styles.kitchenHeaderCopy}>
+            <Text style={styles.kitchenEyebrow}>HARVEST & PRESERVATION</Text>
+            <Text style={styles.kitchenTitle}>Kitchen log</Text>
+          </View>
+          <Ionicons name="basket-outline" size={22} color={WARM_THEME.accentWarm} />
+        </View>
+        <Text style={styles.kitchenDescription}>
+          Record what you picked and where it went, from fresh meals to preserved batches.
+        </Text>
+
+        <TextInput
+          style={styles.kitchenInput}
+          value={kitchenItem}
+          onChangeText={setKitchenItem}
+          placeholder="Harvest item or variety"
+          placeholderTextColor={WARM_THEME.textSecondary}
+          accessibilityLabel="Harvest item or variety"
+          returnKeyType="next"
+        />
+        <TextInput
+          style={styles.kitchenInput}
+          value={kitchenQuantity}
+          onChangeText={setKitchenQuantity}
+          placeholder="Quantity / amount (optional, e.g. 500 g or 2 jars)"
+          placeholderTextColor={WARM_THEME.textSecondary}
+          accessibilityLabel="Optional harvest quantity or amount"
+          returnKeyType="next"
+        />
+        <TextInput
+          style={[styles.kitchenInput, styles.kitchenNotesInput]}
+          value={kitchenNotes}
+          onChangeText={setKitchenNotes}
+          placeholder="Notes (optional)"
+          placeholderTextColor={WARM_THEME.textSecondary}
+          accessibilityLabel="Optional harvest notes"
+          multiline
+          textAlignVertical="top"
+        />
+
+        <Text style={styles.kitchenFieldLabel}>What happened to it?</Text>
+        <View style={styles.kitchenOutcomePills}>
+          {KITCHEN_OUTCOMES.map(outcome => {
+            const isSelected = kitchenOutcome === outcome;
+            return (
+              <TouchableOpacity
+                key={outcome}
+                style={[
+                  styles.kitchenOutcomePill,
+                  isSelected && styles.kitchenOutcomePillSelected,
+                ]}
+                onPress={() => setKitchenOutcome(outcome)}
+                activeOpacity={0.76}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`Choose ${outcome} outcome`}
+              >
+                <Text
+                  style={[
+                    styles.kitchenOutcomeText,
+                    isSelected && styles.kitchenOutcomeTextSelected,
+                  ]}
+                >
+                  {outcome}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.kitchenSubmitButton,
+            !kitchenItem.trim() && styles.kitchenSubmitButtonDisabled,
+          ]}
+          onPress={saveKitchenLog}
+          activeOpacity={0.78}
+          disabled={!kitchenItem.trim()}
+          accessibilityRole="button"
+          accessibilityLabel="Add harvest outcome to kitchen log"
+        >
+          <Ionicons
+            name="add-circle-outline"
+            size={18}
+            color={kitchenItem.trim() ? WARM_THEME.accentText : WARM_THEME.textSecondary}
+          />
+          <Text
+            style={[
+              styles.kitchenSubmitText,
+              !kitchenItem.trim() && styles.kitchenSubmitTextDisabled,
+            ]}
+          >
+            Add to kitchen log
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.kitchenRecentHeader}>
+          <Text style={styles.kitchenRecentTitle}>
+            Recent entries ({harvestKitchenLogs.length})
+          </Text>
+          {harvestKitchenLogs.length > 0 && (
+            <TouchableOpacity
+              style={styles.kitchenClearButton}
+              onPress={confirmClearKitchenLogs}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Clear harvest and kitchen log"
+            >
+              <Text style={styles.kitchenClearText}>Clear log</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {harvestKitchenLogs.length > 0 ? (
+          <View style={styles.kitchenLogList}>
+            {harvestKitchenLogs.map(entry => (
+              <View key={entry.id} style={styles.kitchenLogRow}>
+                <View style={styles.kitchenLogCopy}>
+                  <Text style={styles.kitchenLogItem}>{entry.item}</Text>
+                  {entry.quantity ? (
+                    <Text style={styles.kitchenLogMeta}>Amount: {entry.quantity}</Text>
+                  ) : null}
+                  {entry.notes ? (
+                    <Text style={styles.kitchenLogMeta}>{entry.notes}</Text>
+                  ) : null}
+                  <Text style={styles.kitchenLogTime}>
+                    {formatLocalLogTimestamp(entry.loggedAt)}
+                  </Text>
+                </View>
+                <View style={styles.kitchenLogOutcomePill}>
+                  <Text style={styles.kitchenLogOutcomeText}>{entry.outcome}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.kitchenRemoveButton}
+                  onPress={() => deleteHarvestKitchenLog(entry.id)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${entry.item} kitchen log entry`}
+                >
+                  <Ionicons name="trash-outline" size={16} color={WARM_THEME.accent} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.kitchenEmptyCard}>
+            <Text style={styles.kitchenEmptyText}>
+              Your harvests and kitchen outcomes will appear here.
+            </Text>
+          </View>
         )}
       </View>
 
@@ -2109,6 +2303,202 @@ const styles = StyleSheet.create({
     color: WARM_THEME.textSecondary,
   },
   batchNoHistory: { fontSize: 11, color: WARM_THEME.textSecondary },
+  kitchenCard: {
+    gap: 12,
+    padding: 16,
+    borderRadius: WARM_THEME.radiusCard,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+    ...cardShadow,
+  },
+  kitchenHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  kitchenHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
+  kitchenEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: WARM_THEME.accentWarm,
+  },
+  kitchenTitle: { fontSize: 17, fontWeight: '800', color: WARM_THEME.textPrimary },
+  kitchenDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: WARM_THEME.textSecondary,
+  },
+  kitchenInput: {
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+    color: WARM_THEME.textPrimary,
+    fontSize: 13,
+  },
+  kitchenNotesInput: { minHeight: 76 },
+  kitchenFieldLabel: { fontSize: 12, fontWeight: '800', color: WARM_THEME.textPrimary },
+  kitchenOutcomePills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  kitchenOutcomePill: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    maxWidth: '100%',
+    minHeight: 40,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  kitchenOutcomePillSelected: {
+    borderColor: WARM_THEME.accent,
+    backgroundColor: WARM_THEME.accent,
+  },
+  kitchenOutcomeText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '700',
+    color: WARM_THEME.textPrimary,
+  },
+  kitchenOutcomeTextSelected: { color: WARM_THEME.accentText },
+  kitchenSubmitButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: WARM_THEME.accent,
+  },
+  kitchenSubmitButtonDisabled: { backgroundColor: WARM_THEME.surfaceMuted },
+  kitchenSubmitText: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '800',
+    color: WARM_THEME.accentText,
+  },
+  kitchenSubmitTextDisabled: { color: WARM_THEME.textSecondary },
+  kitchenRecentHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 2,
+  },
+  kitchenRecentTitle: { fontSize: 12, fontWeight: '800', color: WARM_THEME.textPrimary },
+  kitchenClearButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  kitchenClearText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+    color: WARM_THEME.accent,
+  },
+  kitchenLogList: { gap: 8 },
+  kitchenLogRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+  },
+  kitchenLogCopy: { flex: 1, minWidth: 0, gap: 3 },
+  kitchenLogItem: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 13,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  kitchenLogMeta: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    lineHeight: 15,
+    color: WARM_THEME.textSecondary,
+  },
+  kitchenLogTime: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    color: WARM_THEME.textSecondary,
+  },
+  kitchenLogOutcomePill: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    maxWidth: '100%',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.accentSoft,
+  },
+  kitchenLogOutcomeText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    fontWeight: '800',
+    color: WARM_THEME.accent,
+  },
+  kitchenRemoveButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+  },
+  kitchenEmptyCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+  },
+  kitchenEmptyText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    lineHeight: 17,
+    color: WARM_THEME.textSecondary,
+  },
   pantryCard: {
     backgroundColor: WARM_THEME.surface,
     borderRadius: WARM_THEME.radiusCard,
