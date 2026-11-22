@@ -9,6 +9,7 @@ import { useGarden } from '../../context/GardenContext';
 import { useAdminAccess } from '../../utils/adminAccess';
 import { WARM_THEME } from '../../utils/warmTheme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useProEntitlement } from '../../hooks/useProEntitlement';
 
 interface WeatherData {
   currentTemp: number;
@@ -532,6 +533,13 @@ export default function PulseScreen() {
     toggleReminder, catchUpReminders, loadSampleGarden,
   } = useGarden();
 
+  const {
+    isPro,
+    isLoading: isProLoading,
+    isAvailable: isProBillingAvailable,
+    error: proEntitlementError,
+    refreshEntitlement,
+  } = useProEntitlement();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [modal, setModal] = useState<'none' | 'harvest' | 'expense' | 'auth'>('none');
@@ -762,6 +770,12 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
             <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn}>
               <Ionicons name="refresh" size={16} color={WARM_THEME.accent} />
             </TouchableOpacity>
+            {isPro && (
+              <View style={styles.proActiveBadge}>
+                <Ionicons name="sparkles" size={14} color={WARM_THEME.textPrimary} />
+                <Text style={styles.proActiveBadgeText}>Pro Active</Text>
+              </View>
+            )}
             <TouchableOpacity
               onPress={() => setShowSubscription(true)}
               style={styles.proButton}
@@ -803,6 +817,102 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         imageAlt="App icon"
         badgeText="Garden"
       />
+
+      <View style={styles.proFeatureCard}>
+        <View style={styles.proFeatureHeading}>
+          <View style={styles.proFeatureCopy}>
+            <Text style={styles.proFeatureEyebrow}>GARDEN PLANNER PRO</Text>
+            <Text style={styles.proFeatureTitle}>Seasonal garden planner</Text>
+          </View>
+          <View style={isPro ? styles.proActiveBadge : styles.proLockedBadge}>
+            <Ionicons
+              name={isPro ? 'sparkles' : 'lock-closed'}
+              size={14}
+              color={isPro ? WARM_THEME.textPrimary : WARM_THEME.accent}
+            />
+            <Text style={isPro ? styles.proActiveBadgeText : styles.proLockedBadgeText}>
+              {isPro ? 'Pro Active' : 'Locked'}
+            </Text>
+          </View>
+        </View>
+        {isPro ? (
+          <>
+            <Text style={styles.proFeatureDescription}>
+              Your Pro planner is unlocked. Keep seasonal tasks and garden routines within easy reach.
+            </Text>
+            <View style={styles.proFeatureRow}>
+              <Ionicons name="calendar-outline" size={18} color={WARM_THEME.accentWarm} />
+              <View style={styles.proFeatureRowCopy}>
+                <Text style={styles.proFeatureRowTitle}>Seasonal planning tools</Text>
+                <Text style={styles.proFeatureDescription}>
+                  Plan ahead and keep your next garden steps organized.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.proRefreshButton}
+              onPress={() => void refreshEntitlement()}
+              disabled={isProLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh Pro subscription status"
+            >
+              {isProLoading ? (
+                <ActivityIndicator color={WARM_THEME.accent} size="small" />
+              ) : (
+                <Ionicons name="refresh" size={15} color={WARM_THEME.accent} />
+              )}
+              <Text style={styles.proRefreshButtonText}>
+                {isProLoading ? 'Checking status...' : 'Refresh Pro status'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.proFeatureDescription}>
+              Unlock seasonal planning tools and a more complete set of garden planner features.
+            </Text>
+            {!isProBillingAvailable && (
+              <Text style={styles.proBillingNote}>
+                Billing is unavailable in this build. Pro stays locked until a supported Android build and RevenueCat key are configured.
+              </Text>
+            )}
+            {proEntitlementError && (
+              <Text style={styles.proBillingError}>
+                Pro status could not be refreshed. {proEntitlementError}
+              </Text>
+            )}
+            <View style={styles.proFeatureActions}>
+              <TouchableOpacity
+                style={[styles.proUnlockButton, styles.proUnlockAction]}
+                onPress={() => setShowSubscription(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Open subscription options to unlock Pro"
+              >
+                <Ionicons name="lock-open-outline" size={16} color={WARM_THEME.accentText} />
+                <Text style={styles.proUnlockButtonText}>Unlock Garden Planner Pro</Text>
+              </TouchableOpacity>
+              {isProBillingAvailable && (
+                <TouchableOpacity
+                  style={[styles.proRefreshButton, styles.proRefreshAction]}
+                  onPress={() => void refreshEntitlement()}
+                  disabled={isProLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Refresh Pro subscription status"
+                >
+                  {isProLoading ? (
+                    <ActivityIndicator color={WARM_THEME.accent} size="small" />
+                  ) : (
+                    <Ionicons name="refresh" size={15} color={WARM_THEME.accent} />
+                  )}
+                  <Text style={styles.proRefreshButtonText}>
+                    {isProLoading ? 'Checking...' : 'Refresh status'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+      </View>
 
       <View style={styles.focusCard}>
         <View style={styles.focusHeader}>
@@ -1136,6 +1246,167 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     fontSize: 11,
+    fontWeight: '800',
+    color: WARM_THEME.accentText,
+  },
+  proActiveBadge: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.accentWarm,
+  },
+  proActiveBadgeText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  proFeatureCard: {
+    gap: 12,
+    padding: 16,
+    borderRadius: WARM_THEME.radiusCard,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+  },
+  proFeatureHeading: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  proFeatureCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  proFeatureEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: WARM_THEME.accent,
+  },
+  proFeatureTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  proLockedBadge: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '100%',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  proLockedBadgeText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '800',
+    color: WARM_THEME.accent,
+  },
+  proFeatureDescription: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: WARM_THEME.textSecondary,
+  },
+  proFeatureRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    borderRadius: 12,
+    backgroundColor: WARM_THEME.background,
+  },
+  proFeatureRowCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 3,
+  },
+  proFeatureRowTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  proBillingNote: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: WARM_THEME.textSecondary,
+  },
+  proBillingError: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: WARM_THEME.accent,
+  },
+  proFeatureActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  proRefreshButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  proRefreshAction: {
+    flexGrow: 1,
+    flexBasis: 120,
+    minWidth: 120,
+    alignSelf: 'auto',
+  },
+  proRefreshButtonText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+    color: WARM_THEME.accent,
+  },
+  proUnlockButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: WARM_THEME.accent,
+  },
+  proUnlockAction: {
+    flexGrow: 1,
+    flexBasis: 180,
+    minWidth: 150,
+  },
+  proUnlockButtonText: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    fontSize: 13,
     fontWeight: '800',
     color: WARM_THEME.accentText,
   },
