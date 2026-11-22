@@ -1899,7 +1899,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         </TouchableOpacity>
       )}
 
-      {isAdmin ? (
+      {isAdmin && (
         <TouchableOpacity
           onPress={handleAdminEntryPress}
           style={{ alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 }}
@@ -1907,15 +1907,6 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           accessibilityLabel="Open Admin console"
         >
           <Text style={{ color: WARM_THEME.textSecondary, fontSize: 11, fontWeight: '600' }}>Open Admin</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          onPress={handleAdminEntryPress}
-          style={{ alignSelf: 'center', paddingHorizontal: 10, paddingVertical: 6, marginTop: 6 }}
-          accessibilityRole="button"
-          accessibilityLabel="Unlock Admin console"
-        >
-          <Text style={{ color: WARM_THEME.textSecondary, fontSize: 11, fontWeight: '600' }}>Admin</Text>
         </TouchableOpacity>
       )}
 

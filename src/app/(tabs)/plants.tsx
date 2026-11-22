@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import {
   Category,
   Stage,
 } from '../../context/GardenContext';
+import { getTypeaheadPlantOptions } from '../../utils/plantSearch';
+import type { PlantSearchOption } from '../../utils/plantSearch';
 
 const SITES = ['All', 'Raised Beds', 'Pots', 'Standing Bed', 'Front Yard', 'Backyard'];
 const CATEGORIES: Category[] = ['Vegetable', 'Chilli', 'Fruit', 'Herb', 'Leafy'];
@@ -28,6 +30,7 @@ const STAGES: Stage[] = ['Seedling', 'Growing', 'Flowering', 'Fruiting', 'Dorman
 export default function PlantsScreen() {
   const {
     plants,
+    seeds,
     fertilizers,
     addPlant,
     updatePlantQty,
@@ -43,12 +46,72 @@ export default function PlantsScreen() {
 
   const [name, setName] = useState('Tomato');
   const [variety, setVariety] = useState('');
+  const [showPlantSuggestions, setShowPlantSuggestions] = useState(false);
+  const [showVarietySuggestions, setShowVarietySuggestions] = useState(false);
   const [category, setCategory] = useState<Category>('Vegetable');
   const [site, setSite] = useState('Pots');
   const [stage, setStage] = useState<Stage>('Seedling');
   const [quantityText, setQuantityText] = useState('1');
   const [potSize, setPotSize] = useState('300mm (15L)');
   const [waterEveryDaysText, setWaterEveryDaysText] = useState('2');
+
+  const plantSearchSources = useMemo(() => {
+    const sourcesByName = new Map<
+      string,
+      { id: string; name: string; category?: Category; varieties: Set<string> }
+    >();
+
+    const addSource = (
+      id: string,
+      plantName: string,
+      plantCategory?: Category,
+      plantVariety?: string
+    ) => {
+      const trimmedName = plantName.trim();
+      if (!trimmedName) return;
+
+      const key = trimmedName.toLowerCase();
+      let source = sourcesByName.get(key);
+      if (!source) {
+        source = {
+          id,
+          name: trimmedName,
+          category: plantCategory,
+          varieties: new Set<string>(),
+        };
+        sourcesByName.set(key, source);
+      } else if (!source.category && plantCategory) {
+        source.category = plantCategory;
+      }
+
+      const trimmedVariety = plantVariety?.trim();
+      if (trimmedVariety && trimmedVariety.toLowerCase() !== 'standard') {
+        source.varieties.add(trimmedVariety);
+      }
+    };
+
+    PLANT_LIBRARY.forEach(plant => addSource(plant.id, plant.name, plant.category));
+    plants.forEach(plant => addSource(plant.id, plant.name, plant.category, plant.variety));
+    seeds.forEach(seed => addSource(seed.id, seed.name, undefined, seed.variety));
+
+    return Array.from(sourcesByName.values(), source => ({
+      id: source.id,
+      name: source.name,
+      category: source.category,
+      varieties: Array.from(source.varieties),
+    }));
+  }, [plants, seeds]);
+  const plantSuggestions = useMemo(
+    () => getTypeaheadPlantOptions(name, plantSearchSources),
+    [name, plantSearchSources]
+  );
+  const varietySuggestions = useMemo(
+    () =>
+      getTypeaheadPlantOptions(variety, plantSearchSources).filter(
+        suggestion => suggestion.varietyName
+      ),
+    [variety, plantSearchSources]
+  );
 
   const placementCheck = checkPlantPlacementWarnings(
     {
@@ -66,10 +129,17 @@ export default function PlantsScreen() {
   const applyLibraryPreset = (cropName: string) => {
     const match = PLANT_LIBRARY.find(item => item.name === cropName);
     setName(cropName);
+    setShowPlantSuggestions(false);
+    setShowVarietySuggestions(false);
     if (match) {
       setCategory(match.category);
       setPotSize(`${match.potMm}mm (${match.potL}L)`);
     }
+  };
+
+  const selectPlantSuggestion = (suggestion: PlantSearchOption) => {
+    applyLibraryPreset(suggestion.plantName);
+    setVariety(suggestion.varietyName ?? '');
   };
 
   const handleSavePlant = () => {
@@ -99,6 +169,8 @@ export default function PlantsScreen() {
 
     setVariety('');
     setQuantityText('1');
+    setShowPlantSuggestions(false);
+    setShowVarietySuggestions(false);
     setModalVisible(false);
   };
 
@@ -278,17 +350,61 @@ export default function PlantsScreen() {
               <TextInput
                 placeholder="e.g. Tomato, Chilli, Sweet Basil"
                 value={name}
-                onChangeText={setName}
+                onChangeText={value => {
+                  setName(value);
+                  setShowPlantSuggestions(true);
+                }}
                 style={styles.input}
               />
+              {showPlantSuggestions && name.trim().length > 0 && (
+                <View style={styles.suggestionList}>
+                  {plantSuggestions.length > 0 ? (
+                    plantSuggestions.map(suggestion => (
+                      <TouchableOpacity
+                        key={suggestion.id}
+                        style={styles.suggestionChip}
+                        onPress={() => selectPlantSuggestion(suggestion)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Select ${suggestion.label}`}
+                      >
+                        <Text style={styles.suggestionChipText}>{suggestion.label}</Text>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noSuggestionsText}>No matching plants or varieties.</Text>
+                  )}
+                </View>
+              )}
 
               <Text style={styles.fieldLabel}>Variety</Text>
               <TextInput
                 placeholder="e.g. Tommy Toe, Jalapeño, Genovese"
                 value={variety}
-                onChangeText={setVariety}
+                onChangeText={value => {
+                  setVariety(value);
+                  setShowVarietySuggestions(true);
+                }}
                 style={styles.input}
               />
+              {showVarietySuggestions && variety.trim().length > 0 && (
+                <View style={styles.suggestionList}>
+                  {varietySuggestions.length > 0 ? (
+                    varietySuggestions.map(suggestion => (
+                      <TouchableOpacity
+                        key={suggestion.id}
+                        style={styles.suggestionChip}
+                        onPress={() => selectPlantSuggestion(suggestion)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Select ${suggestion.label}`}
+                      >
+                        <Text style={styles.suggestionChipText}>{suggestion.label}</Text>
+                      </TouchableOpacity>
+                    ))
+                  ) : (
+                    <Text style={styles.noSuggestionsText}>No matching varieties.</Text>
+                  )}
+                </View>
+              )}
 
               <Text style={styles.fieldLabel}>Spot / Location</Text>
               <View style={styles.wrapRow}>
@@ -579,6 +695,17 @@ const styles = StyleSheet.create({
   presetChipActive: { backgroundColor: WARM_THEME.accent },
   presetChipText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textSecondary },
   presetChipTextActive: { color: WARM_THEME.accentText },
+  suggestionList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  suggestionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.surfaceMuted,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+  },
+  suggestionChipText: { fontSize: 12, fontWeight: '600', color: WARM_THEME.textPrimary },
+  noSuggestionsText: { fontSize: 12, color: WARM_THEME.textSecondary },
   sameSiteBox: {
     backgroundColor: WARM_THEME.surfaceMuted,
     borderRadius: 10,
