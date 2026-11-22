@@ -563,6 +563,7 @@ export default function PulseScreen() {
     error: proEntitlementError,
     refreshEntitlement,
   } = useProEntitlement();
+  const hasKitchenLogAccess = isPro && !isProLoading;
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loadingWeather, setLoadingWeather] = useState(true);
   const [modal, setModal] = useState<'none' | 'harvest' | 'expense' | 'auth'>('none');
@@ -1340,6 +1341,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         )}
       </View>
 
+      {hasKitchenLogAccess ? (
       <View style={styles.kitchenCard}>
         <View style={styles.kitchenHeader}>
           <View style={styles.kitchenHeaderCopy}>
@@ -1493,6 +1495,45 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           </View>
         )}
       </View>
+      ) : (
+        <View style={styles.kitchenProCard}>
+          <View style={styles.kitchenHeader}>
+            <View style={styles.kitchenHeaderCopy}>
+              <Text style={styles.kitchenEyebrow}>HARVEST & PRESERVATION</Text>
+              <Text style={styles.kitchenTitle}>Kitchen log</Text>
+            </View>
+            <View style={styles.kitchenProBadge}>
+              <Ionicons name="lock-closed" size={13} color={WARM_THEME.accent} />
+              <Text style={styles.kitchenProBadgeText}>Pro feature</Text>
+            </View>
+          </View>
+          <Text style={styles.kitchenDescription}>
+            Logging harvests and preserving or kitchen batches is a Garden Planner Pro feature.
+            Upgrade to record what you picked and how you used it.
+          </Text>
+          {isProLoading && (
+            <View style={styles.kitchenProStatus}>
+              <ActivityIndicator size="small" color={WARM_THEME.accentWarm} />
+              <Text style={styles.kitchenProStatusText}>Checking your subscription status...</Text>
+            </View>
+          )}
+          {proEntitlementError ? (
+            <Text style={styles.kitchenProError}>{proEntitlementError}</Text>
+          ) : null}
+          <View style={styles.proFeatureActions}>
+            <TouchableOpacity
+              style={[styles.proUnlockButton, styles.proUnlockAction]}
+              onPress={() => setShowSubscription(true)}
+              activeOpacity={0.78}
+              accessibilityRole="button"
+              accessibilityLabel="Open subscription options to unlock the kitchen log"
+            >
+              <Ionicons name="lock-open-outline" size={16} color={WARM_THEME.accentText} />
+              <Text style={styles.proUnlockButtonText}>Explore Pro plans</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {surplusHarvests.length > 0 && (
         <View style={styles.pantryCard}>
@@ -2312,6 +2353,15 @@ const styles = StyleSheet.create({
     backgroundColor: WARM_THEME.surface,
     ...cardShadow,
   },
+  kitchenProCard: {
+    gap: 12,
+    padding: 16,
+    borderRadius: WARM_THEME.radiusCard,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+    ...cardShadow,
+  },
   kitchenHeader: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -2320,6 +2370,45 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   kitchenHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
+  kitchenProBadge: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  kitchenProBadgeText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '800',
+    color: WARM_THEME.accent,
+  },
+  kitchenProStatus: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  kitchenProStatusText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    color: WARM_THEME.textSecondary,
+  },
+  kitchenProError: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    lineHeight: 16,
+    color: WARM_THEME.accent,
+  },
   kitchenEyebrow: {
     fontSize: 10,
     fontWeight: '800',
