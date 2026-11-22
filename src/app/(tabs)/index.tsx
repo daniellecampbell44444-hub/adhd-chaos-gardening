@@ -763,11 +763,11 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
             <Text style={styles.heroTitle}>ADHD Chaos Gardening</Text>
           </View>
           <View style={styles.heroActions}>
-            <TouchableOpacity onPress={() => setModal('auth')} style={styles.cloudBtn}>
+            <TouchableOpacity onPress={() => setModal('auth')} style={styles.cloudBtn} activeOpacity={0.78}>
               <Ionicons name={user ? 'cloud-done' : 'cloud-outline'} size={16} color={WARM_THEME.accent} />
               <Text style={styles.cloudTxt}>{syncLabel}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn}>
+            <TouchableOpacity onPress={fetchWeather} style={styles.refreshBtn} activeOpacity={0.78}>
               <Ionicons name="refresh" size={16} color={WARM_THEME.accent} />
             </TouchableOpacity>
             {isPro && (
@@ -779,6 +779,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
             <TouchableOpacity
               onPress={() => setShowSubscription(true)}
               style={styles.proButton}
+              activeOpacity={0.78}
               accessibilityRole="button"
               accessibilityLabel="Open Pro subscription options"
             >
@@ -797,10 +798,22 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           <View style={styles.weatherBox}>
             <View style={styles.weatherMain}>
               <Text style={styles.tempNow}>{wInfo.icon} {weather.currentTemp}°C</Text>
-              <View>
-                <Text style={styles.weatherLabel}>{wInfo.label} • {weather.humidity}% humidity</Text>
-                <Text style={styles.weatherSub}>Today: {weather.todayMin}°–{weather.todayMax}°C • 💧 {weather.todayRain}% rain</Text>
-                <Text style={styles.weatherSub}>Tomorrow: {weather.tomorrowMin}°–{weather.tomorrowMax}°C • 💧 {weather.tomorrowRain}% rain</Text>
+              <View style={styles.weatherDetails}>
+                <View style={styles.weatherMetadataPill}>
+                  <Text style={styles.weatherMetadataText}>
+                    {wInfo.label} • {weather.humidity}% humidity
+                  </Text>
+                </View>
+                <View style={styles.weatherMetadataPill}>
+                  <Text style={styles.weatherMetadataText}>
+                    Today: {weather.todayMin}°–{weather.todayMax}°C • {weather.todayRain}% rain
+                  </Text>
+                </View>
+                <View style={styles.weatherMetadataPill}>
+                  <Text style={styles.weatherMetadataText}>
+                    Tomorrow: {weather.tomorrowMin}°–{weather.tomorrowMax}°C • {weather.tomorrowRain}% rain
+                  </Text>
+                </View>
               </View>
             </View>
             <Text style={styles.updatedTxt}>Updated {weather.updatedAt}</Text>
@@ -852,6 +865,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
             <TouchableOpacity
               style={styles.proRefreshButton}
               onPress={() => void refreshEntitlement()}
+              activeOpacity={0.78}
               disabled={isProLoading}
               accessibilityRole="button"
               accessibilityLabel="Refresh Pro subscription status"
@@ -885,6 +899,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
               <TouchableOpacity
                 style={[styles.proUnlockButton, styles.proUnlockAction]}
                 onPress={() => setShowSubscription(true)}
+                activeOpacity={0.78}
                 accessibilityRole="button"
                 accessibilityLabel="Open subscription options to unlock Pro"
               >
@@ -895,6 +910,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
                 <TouchableOpacity
                   style={[styles.proRefreshButton, styles.proRefreshAction]}
                   onPress={() => void refreshEntitlement()}
+                  activeOpacity={0.78}
                   disabled={isProLoading}
                   accessibilityRole="button"
                   accessibilityLabel="Refresh Pro subscription status"
@@ -916,11 +932,11 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
 
       <View style={styles.focusCard}>
         <View style={styles.focusHeader}>
-          <View style={{ flex: 1, minWidth: 150 }}>
+          <View style={styles.focusHeadingCopy}>
             <Text style={styles.focusTag}>NO OVERWHELM • MAX 3</Text>
             <Text style={styles.focusTitle}>🎯 Top-3 Today</Text>
           </View>
-          <TouchableOpacity style={styles.resetBtn} onPress={handleCatchUpReset}>
+          <TouchableOpacity style={styles.resetBtn} onPress={handleCatchUpReset} activeOpacity={0.78}>
             <Ionicons name="sparkles-outline" size={14} color={WARM_THEME.accent} />
             <Text style={styles.resetBtnText}>Catch-Up Reset</Text>
           </TouchableOpacity>
@@ -934,13 +950,15 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           <Text style={styles.emptyFocus}>Load your starter garden or add a plant to get gentle daily focus picks.</Text>
         ) : (
           topThree.map((item, idx) => (
-            <TouchableOpacity key={item.id} style={styles.focusRow} onPress={item.onPress}>
+            <TouchableOpacity key={item.id} style={styles.focusRow} onPress={item.onPress} activeOpacity={0.8}>
               <View style={styles.focusNum}>
                 <Text style={styles.focusNumText}>{idx + 1}</Text>
               </View>
-              <View style={{ flex: 1 }}>
+              <View style={styles.focusItemCopy}>
                 <Text style={styles.focusItemText}>{item.label}</Text>
-                <Text style={styles.focusMeta}>{item.meta}</Text>
+                <View style={styles.focusMetaPill}>
+                  <Text style={styles.focusMeta}>{item.meta}</Text>
+                </View>
               </View>
               <Ionicons name="checkmark-circle-outline" size={22} color={WARM_THEME.accent} />
             </TouchableOpacity>
@@ -994,19 +1012,19 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
       )}
 
       <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => { waterAll(); Alert.alert('Watered!', 'All plants logged as watered today.'); }}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => { waterAll(); Alert.alert('Watered!', 'All plants logged as watered today.'); }} activeOpacity={0.78}>
           <Ionicons name="water" size={20} color={WARM_THEME.accentWarm} />
           <Text style={styles.actionLabel}>Water All</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => { feedAll(); Alert.alert('Fed!', 'All active plants logged as fed today.'); }}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => { feedAll(); Alert.alert('Fed!', 'All active plants logged as fed today.'); }} activeOpacity={0.78}>
           <Ionicons name="leaf" size={20} color={WARM_THEME.accent} />
           <Text style={styles.actionLabel}>Bulk Feed</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('harvest')}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('harvest')} activeOpacity={0.78}>
           <Ionicons name="basket" size={20} color={WARM_THEME.accentWarm} />
           <Text style={styles.actionLabel}>Log Yield</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('expense')}>
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setModal('expense')} activeOpacity={0.78}>
           <Ionicons name="cash" size={20} color={WARM_THEME.accent} />
           <Text style={styles.actionLabel}>Expense</Text>
         </TouchableOpacity>
@@ -1017,7 +1035,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           <Text style={styles.bannerTitle}>READY TO HARVEST ({readyToPick.length})</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
             {readyToPick.map(p => (
-              <TouchableOpacity key={p.id} style={styles.pickChip} onPress={() => { setCrop(`${p.variety} ${p.name}`); setModal('harvest'); }}>
+              <TouchableOpacity key={p.id} style={styles.pickChip} onPress={() => { setCrop(`${p.variety} ${p.name}`); setModal('harvest'); }} activeOpacity={0.78}>
                 <Text style={styles.pickChipText}>{p.variety} {p.name} → Pick</Text>
               </TouchableOpacity>
             ))}
@@ -1038,7 +1056,7 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
       </View>
 
       {plants.length === 0 && (
-        <TouchableOpacity style={styles.starterBtn} onPress={loadSampleGarden}>
+        <TouchableOpacity style={styles.starterBtn} onPress={loadSampleGarden} activeOpacity={0.78}>
           <Ionicons name="sparkles" size={18} color={WARM_THEME.accentText} />
           <Text style={styles.starterText}>Load Western Sydney Starter Garden</Text>
         </TouchableOpacity>
@@ -1180,6 +1198,14 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
   );
 }
 
+const cardShadow = {
+  shadowColor: WARM_THEME.textPrimary,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 2,
+};
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: WARM_THEME.background },
   container: { flex: 1, backgroundColor: WARM_THEME.background },
@@ -1191,10 +1217,11 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: WARM_THEME.surface,
     borderRadius: WARM_THEME.radiusCard,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     gap: 12,
+    ...cardShadow,
   },
   heroTop: {
     flexDirection: 'row',
@@ -1274,6 +1301,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     backgroundColor: WARM_THEME.surface,
+    ...cardShadow,
   },
   proFeatureHeading: {
     flexDirection: 'row',
@@ -1420,6 +1448,29 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   weatherMain: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 },
+  weatherDetails: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  weatherMetadataPill: {
+    maxWidth: '100%',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+  },
+  weatherMetadataText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    lineHeight: 14,
+    color: WARM_THEME.textSecondary,
+  },
   tempNow: { color: WARM_THEME.textPrimary, fontSize: 28, fontWeight: '800' },
   weatherLabel: { color: WARM_THEME.accentWarm, fontSize: 13, fontWeight: '700' },
   weatherSub: { color: WARM_THEME.textSecondary, fontSize: 12, marginTop: 2 },
@@ -1430,7 +1481,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
-    gap: 10,
+    gap: 12,
+    ...cardShadow,
   },
   focusHeader: {
     flexDirection: 'row',
@@ -1440,6 +1492,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   focusTag: { fontSize: 10, fontWeight: '800', color: WARM_THEME.accent, letterSpacing: 0.8 },
+  focusHeadingCopy: { flex: 1, minWidth: 0, gap: 3 },
   focusTitle: { fontSize: 18, fontWeight: '800', color: WARM_THEME.textPrimary, marginTop: 2 },
   resetBtn: {
     flexDirection: 'row',
@@ -1460,10 +1513,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     backgroundColor: WARM_THEME.surfaceMuted,
-    padding: 11,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
+    ...cardShadow,
   },
   focusNum: {
     width: 24,
@@ -1474,34 +1528,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   focusNumText: { color: WARM_THEME.accentText, fontSize: 12, fontWeight: '800' },
-  focusItemText: { fontSize: 13, fontWeight: '700', color: WARM_THEME.textPrimary },
-  focusMeta: { fontSize: 11, color: WARM_THEME.textSecondary, marginTop: 2 },
+  focusItemCopy: { flex: 1, minWidth: 0, gap: 5 },
+  focusItemText: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '700', color: WARM_THEME.textPrimary },
+  focusMetaPill: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.accentSoft,
+  },
+  focusMeta: { fontSize: 10, fontWeight: '700', color: WARM_THEME.accent },
   pantryCard: {
     backgroundColor: WARM_THEME.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 16,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
-    gap: 6,
+    gap: 8,
+    ...cardShadow,
   },
   pantryTitle: { fontSize: 13, fontWeight: '800', color: WARM_THEME.accentWarm },
   pantryLine: { fontSize: 12, color: WARM_THEME.textPrimary, lineHeight: 17 },
   seedAlertCard: {
     backgroundColor: WARM_THEME.accentSoft,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 16,
     borderWidth: 1,
     borderColor: WARM_THEME.accentWarm,
-    gap: 5,
+    gap: 8,
+    ...cardShadow,
   },
   seedAlertTitle: { fontSize: 13, fontWeight: '800', color: WARM_THEME.accentWarm },
   seedAlertLine: { fontSize: 12, color: WARM_THEME.textPrimary, lineHeight: 17 },
   alertCard: {
     backgroundColor: WARM_THEME.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 16,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
+    ...cardShadow,
   },
   alertHeat: { backgroundColor: WARM_THEME.accentSoft, borderColor: WARM_THEME.accentWarm },
   alertWarm: { backgroundColor: WARM_THEME.surfaceMuted, borderColor: WARM_THEME.accentWarm },
@@ -1520,20 +1586,22 @@ const styles = StyleSheet.create({
     flexBasis: '45%',
     minWidth: 128,
     backgroundColor: WARM_THEME.surface,
-    borderRadius: 14,
-    paddingVertical: 12,
+    borderRadius: WARM_THEME.radiusCard,
+    paddingVertical: 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     gap: 4,
+    ...cardShadow,
   },
   actionLabel: { fontSize: 11, fontWeight: '700', color: WARM_THEME.textPrimary },
   harvestBanner: {
     backgroundColor: WARM_THEME.accentSoft,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: WARM_THEME.radiusCard,
+    padding: 16,
     borderWidth: 1,
     borderColor: WARM_THEME.accentWarm,
+    ...cardShadow,
   },
   bannerTitle: { fontSize: 12, fontWeight: '800', color: WARM_THEME.accentWarm },
   pickChip: {
@@ -1556,6 +1624,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
+    ...cardShadow,
   },
   statNum: { fontSize: 24, fontWeight: '800', color: WARM_THEME.accent },
   statLabel: { fontSize: 13, color: WARM_THEME.textSecondary, marginTop: 4 },

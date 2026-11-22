@@ -36,6 +36,14 @@ const PRO_BENEFITS = [
   "Track your garden progress from planting through harvest",
 ];
 
+const cardShadow = {
+  shadowColor: WARM_THEME.textPrimary,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 2,
+};
+
 export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>("monthly");
   const [billingMessage, setBillingMessage] = useState<string | null>(null);
@@ -64,6 +72,7 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}
+              activeOpacity={0.78}
               accessibilityRole="button"
               accessibilityLabel="Close subscription screen"
             >
@@ -83,6 +92,7 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
                   key={plan}
                   style={[styles.planCard, selected && styles.planCardSelected]}
                   onPress={() => selectPlan(plan)}
+                  activeOpacity={0.82}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
                 >
@@ -94,12 +104,28 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
                       </View>
                     )}
                   </View>
-                  <Text style={styles.planDescription}>
-                    {details.billingDescription}
-                  </Text>
-                  <Text style={styles.planSelection}>
-                    {selected ? "Selected plan" : "Tap to select"}
-                  </Text>
+                  <View style={styles.planMetadataRow}>
+                    <View style={styles.metadataPill}>
+                      <Text style={styles.metadataPillText}>
+                        {details.billingDescription}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.metadataPill,
+                        selected && styles.metadataPillSelected,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.metadataPillText,
+                          selected && styles.metadataPillTextSelected,
+                        ]}
+                      >
+                        {selected ? "Selected" : "Tap to select"}
+                      </Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
               );
             })}
@@ -125,6 +151,7 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
         <View style={styles.actions}>
           <TouchableOpacity
             style={styles.subscribeButton}
+            activeOpacity={0.8}
             onPress={() =>
               setBillingMessage(
                 "Subscription checkout is not connected yet. No purchase was made."
@@ -138,6 +165,7 @@ export function SubscriptionScreen({ onClose }: SubscriptionScreenProps) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.restoreButton}
+            activeOpacity={0.8}
             onPress={() =>
               setBillingMessage(
                 "Purchase restoration is not connected yet. No purchases were changed."
@@ -175,7 +203,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: WARM_THEME.spacingScreen,
     paddingBottom: WARM_THEME.spacingScreen + 16,
-    gap: 20,
+    gap: 16,
   },
   headerRow: {
     flexDirection: "row",
@@ -220,7 +248,7 @@ const styles = StyleSheet.create({
     color: WARM_THEME.textPrimary,
   },
   section: {
-    gap: 10,
+    gap: 12,
   },
   sectionTitle: {
     fontSize: 17,
@@ -230,18 +258,19 @@ const styles = StyleSheet.create({
   planRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 12,
   },
   planCard: {
     flexGrow: 1,
     flexBasis: 145,
     minWidth: 140,
-    gap: 8,
-    padding: 14,
+    gap: 12,
+    padding: 16,
     borderRadius: WARM_THEME.radiusCard,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     backgroundColor: WARM_THEME.surface,
+    ...cardShadow,
   },
   planCardSelected: {
     borderColor: WARM_THEME.accent,
@@ -271,24 +300,43 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: WARM_THEME.textPrimary,
   },
-  planDescription: {
-    fontSize: 13,
-    lineHeight: 18,
+  planMetadataRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+  metadataPill: {
+    maxWidth: "100%",
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  metadataPillSelected: {
+    borderColor: WARM_THEME.accentWarm,
+    backgroundColor: WARM_THEME.accentWarm,
+  },
+  metadataPillText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    fontWeight: "700",
     color: WARM_THEME.textSecondary,
   },
-  planSelection: {
-    marginTop: 4,
-    fontSize: 11,
-    fontWeight: "700",
-    color: WARM_THEME.accent,
+  metadataPillTextSelected: {
+    color: WARM_THEME.textPrimary,
   },
   benefitsCard: {
-    gap: 14,
+    gap: 12,
     padding: 16,
     borderRadius: WARM_THEME.radiusCard,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     backgroundColor: WARM_THEME.surface,
+    ...cardShadow,
   },
   benefitList: {
     gap: 12,
@@ -363,9 +411,11 @@ const styles = StyleSheet.create({
     color: WARM_THEME.textPrimary,
   },
   billingNote: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: WARM_THEME.radiusCard,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
     backgroundColor: WARM_THEME.surfaceMuted,
   },
   billingNoteText: {

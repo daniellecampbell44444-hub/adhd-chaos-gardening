@@ -165,11 +165,11 @@ export function AdminConsoleScreen({
           />
 
           <View style={styles.wrapRow}>
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleUnlockPress}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleUnlockPress} activeOpacity={0.78}>
               <Text style={styles.primaryBtnText}>Verify Admin</Text>
             </TouchableOpacity>
             {onClose && (
-              <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
+              <TouchableOpacity style={styles.secondaryBtn} onPress={onClose} activeOpacity={0.78}>
                 <Text style={styles.secondaryBtnText}>Back</Text>
               </TouchableOpacity>
             )}
@@ -294,7 +294,7 @@ export function AdminConsoleScreen({
             <Text style={styles.title}>Admin Control Room</Text>
             <Text style={styles.subtitle}>Catalog, Swap policy & app controls</Text>
           </View>
-          <TouchableOpacity style={styles.lockBtn} onPress={onLock}>
+          <TouchableOpacity style={styles.lockBtn} onPress={onLock} activeOpacity={0.78}>
             <Text style={styles.lockBtnText}>Lock Admin</Text>
           </TouchableOpacity>
         </View>
@@ -319,6 +319,7 @@ export function AdminConsoleScreen({
                 key={tab}
                 style={[styles.tabBtn, active && styles.tabBtnActive]}
                 onPress={() => setActiveTab(tab)}
+                activeOpacity={0.78}
               >
                 <Text style={[styles.tabText, active && styles.tabTextActive]}>
                   {tab === "catalog"
@@ -335,23 +336,40 @@ export function AdminConsoleScreen({
         {activeTab === "catalog" && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Add Seed, Plant, or Garden Item</Text>
-            <TextInput
-              value={itemName}
-              onChangeText={(value) => {
-                setItemName(value);
-                setShowPlantSuggestions(
-                  itemKind === "Plant" && value.trim().length > 0
-                );
-              }}
-              onFocus={() => {
-                if (itemKind === "Plant" && itemName.trim()) {
-                  setShowPlantSuggestions(true);
-                }
-              }}
-              placeholder="e.g. Black Krim Tomato or Dwarf Eureka Lemon"
-              placeholderTextColor={WARM_THEME.textSecondary}
-              style={styles.input}
-            />
+            <View style={styles.searchBar}>
+              <TextInput
+                value={itemName}
+                onChangeText={(value) => {
+                  setItemName(value);
+                  setShowPlantSuggestions(
+                    itemKind === "Plant" && value.trim().length > 0
+                  );
+                }}
+                onFocus={() => {
+                  if (itemKind === "Plant" && itemName.trim()) {
+                    setShowPlantSuggestions(true);
+                  }
+                }}
+                placeholder="e.g. Black Krim Tomato or Dwarf Eureka Lemon"
+                placeholderTextColor={WARM_THEME.textSecondary}
+                style={styles.searchInput}
+                accessibilityLabel="Search plants, varieties, or enter an item name"
+              />
+              {itemName.length > 0 && (
+                <TouchableOpacity
+                  style={styles.quickClearButton}
+                  activeOpacity={0.78}
+                  onPress={() => {
+                    setItemName("");
+                    setShowPlantSuggestions(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear item search"
+                >
+                  <Text style={styles.quickClearButtonText}>Clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {itemKind === "Plant" &&
               showPlantSuggestions &&
@@ -362,6 +380,7 @@ export function AdminConsoleScreen({
                       <TouchableOpacity
                         key={suggestion.id}
                         style={styles.suggestionRow}
+                        activeOpacity={0.78}
                         onPress={() => {
                           setItemName(
                             suggestion.varietyName
@@ -375,16 +394,39 @@ export function AdminConsoleScreen({
                           {suggestion.label}
                         </Text>
                         {suggestion.subtitle && (
-                          <Text style={styles.suggestionSubtitle}>
-                            {suggestion.subtitle}
-                          </Text>
+                          <View style={styles.suggestionMetadataRow}>
+                            <View style={styles.suggestionMetadataPill}>
+                              <Text style={styles.suggestionSubtitle}>
+                                {suggestion.subtitle}
+                              </Text>
+                            </View>
+                          </View>
                         )}
                       </TouchableOpacity>
                     ))
                   ) : (
-                    <Text style={styles.suggestionEmpty}>
-                      No matching plants or varieties. You can still add the name as entered.
-                    </Text>
+                    <View style={styles.suggestionEmptyCard}>
+                      <View style={styles.suggestionEmptyCopy}>
+                        <Text style={styles.suggestionEmptyTitle}>
+                          No matching plants or varieties
+                        </Text>
+                        <Text style={styles.suggestionEmpty}>
+                          You can still add the name as entered, or clear the search to start again.
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.resetSearchButton}
+                        activeOpacity={0.78}
+                        onPress={() => {
+                          setItemName("");
+                          setShowPlantSuggestions(false);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear plant search"
+                      >
+                        <Text style={styles.resetSearchButtonText}>Clear search</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               )}
@@ -396,6 +438,10 @@ export function AdminConsoleScreen({
                   <TouchableOpacity
                     key={kind}
                     style={[styles.pill, selected && styles.pillActive]}
+                    activeOpacity={0.78}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`${kind} filter`}
                     onPress={() => {
                       setItemKind(kind);
                       setShowPlantSuggestions(
@@ -416,6 +462,7 @@ export function AdminConsoleScreen({
               <TouchableOpacity
                 style={styles.toggleBox}
                 onPress={() => setSeedPostage((prev) => !prev)}
+                activeOpacity={0.78}
               >
                 <Text style={styles.toggleLabel}>
                   Allow postage for this seed listing: {seedPostage ? "ON" : "OFF"}
@@ -427,17 +474,28 @@ export function AdminConsoleScreen({
               </Text>
             )}
 
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleAddStagedItem}>
+            <TouchableOpacity style={styles.primaryBtn} onPress={handleAddStagedItem} activeOpacity={0.78}>
               <Text style={styles.primaryBtnText}>Save Admin Entry</Text>
             </TouchableOpacity>
 
             {stagedItems.length > 0 && (
               <View style={styles.listBox}>
                 {stagedItems.map((item) => (
-                  <Text key={item.id} style={styles.listItem}>
-                    • {item.name} [{item.kind}] —{" "}
-                    {item.postageAllowed ? "Postage OK" : "Pickup / Swap only"}
-                  </Text>
+                  <View key={item.id} style={styles.stagedItemRow}>
+                    <View style={styles.stagedItemCopy}>
+                      <Text style={styles.stagedItemName}>{item.name}</Text>
+                    </View>
+                    <View style={styles.stagedMetadataRow}>
+                      <View style={styles.stagedMetadataPill}>
+                        <Text style={styles.stagedMetadataText}>{item.kind}</Text>
+                      </View>
+                      <View style={styles.stagedMetadataPill}>
+                        <Text style={styles.stagedMetadataText}>
+                          {item.postageAllowed ? "Postage OK" : "Pickup / Swap only"}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
                 ))}
               </View>
             )}
@@ -474,6 +532,7 @@ export function AdminConsoleScreen({
                     onToggleProPreview(next);
                     setStatusMessage(`Dev Pro Preview set to ${next ? "ON" : "OFF"}`);
                   }}
+                  activeOpacity={0.78}
                 >
                   <Text style={styles.primaryBtnText}>
                     {isProPreview ? "Switch to Free Preview" : "Switch to Pro Preview"}
@@ -501,6 +560,7 @@ export function AdminConsoleScreen({
                         styles.visualPreset,
                         selected && styles.visualPresetSelected,
                       ]}
+                      activeOpacity={0.78}
                       onPress={() =>
                         setVisualSettings((current) => ({
                           ...current,
@@ -577,12 +637,14 @@ export function AdminConsoleScreen({
                 <TouchableOpacity
                   style={styles.primaryBtn}
                   onPress={() => void handlePickImage("bannerImageUri")}
+                  activeOpacity={0.78}
                   disabled={savingVisualSettings}
                 >
                   <Text style={styles.primaryBtnText}>Pick from Gallery</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.secondaryBtn}
+                  activeOpacity={0.78}
                   onPress={() =>
                     setVisualSettings((current) => ({
                       ...current,
@@ -615,12 +677,14 @@ export function AdminConsoleScreen({
                 <TouchableOpacity
                   style={styles.primaryBtn}
                   onPress={() => void handlePickImage("homeCardImageUri")}
+                  activeOpacity={0.78}
                   disabled={savingVisualSettings}
                 >
                   <Text style={styles.primaryBtnText}>Pick from Gallery</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.secondaryBtn}
+                  activeOpacity={0.78}
                   onPress={() =>
                     setVisualSettings((current) => ({
                       ...current,
@@ -639,6 +703,7 @@ export function AdminConsoleScreen({
                   savingVisualSettings && styles.disabledButton,
                 ]}
                 onPress={handleSaveVisualSettings}
+                activeOpacity={0.78}
                 disabled={savingVisualSettings}
               >
                 <Text style={styles.primaryBtnText}>
@@ -652,7 +717,7 @@ export function AdminConsoleScreen({
         {statusMessage && <Text style={styles.statusText}>{statusMessage}</Text>}
 
         {onClose && (
-          <TouchableOpacity style={styles.secondaryBtn} onPress={onClose}>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={onClose} activeOpacity={0.78}>
             <Text style={styles.secondaryBtnText}>Close Admin View</Text>
           </TouchableOpacity>
         )}
@@ -661,6 +726,14 @@ export function AdminConsoleScreen({
   );
 }
 
+const cardShadow = {
+  shadowColor: WARM_THEME.textPrimary,
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.06,
+  shadowRadius: 8,
+  elevation: 2,
+};
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -668,12 +741,13 @@ const styles = StyleSheet.create({
   },
   lockedContainer: {
     margin: WARM_THEME.spacingScreen,
-    padding: 20,
+    padding: 16,
     gap: 12,
     borderRadius: WARM_THEME.radiusCard,
     backgroundColor: WARM_THEME.surface,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
+    ...cardShadow,
   },
   lockedTitle: {
     fontSize: 18,
@@ -740,12 +814,13 @@ const styles = StyleSheet.create({
     color: WARM_THEME.accentText,
   },
   card: {
-    padding: 14,
+    padding: 16,
     borderRadius: WARM_THEME.radiusCard,
     backgroundColor: WARM_THEME.surface,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     gap: 10,
+    ...cardShadow,
   },
   cardTitle: {
     fontSize: 15,
@@ -765,13 +840,13 @@ const styles = StyleSheet.create({
   suggestionList: {
     borderWidth: 1,
     borderColor: WARM_THEME.border,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: WARM_THEME.surface,
     overflow: "hidden",
   },
   suggestionRow: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: WARM_THEME.border,
   },
@@ -781,16 +856,64 @@ const styles = StyleSheet.create({
     color: WARM_THEME.textPrimary,
   },
   suggestionSubtitle: {
-    marginTop: 2,
+    flex: 1,
+    minWidth: 0,
     fontSize: 11,
-    color: WARM_THEME.textSecondary,
+    color: WARM_THEME.accent,
+  },
+  suggestionMetadataRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+  suggestionMetadataPill: {
+    maxWidth: "100%",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: WARM_THEME.radiusPill,
+    backgroundColor: WARM_THEME.accentSoft,
+  },
+  suggestionEmptyCard: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  suggestionEmptyCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  suggestionEmptyTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: WARM_THEME.textPrimary,
   },
   suggestionEmpty: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
     fontSize: 12,
     lineHeight: 17,
     color: WARM_THEME.textSecondary,
+  },
+  resetSearchButton: {
+    minHeight: 44,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.accentWarm,
+    backgroundColor: WARM_THEME.accentSoft,
+  },
+  resetSearchButtonText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: WARM_THEME.accent,
   },
   fieldLabel: {
     flex: 1,
@@ -867,6 +990,42 @@ const styles = StyleSheet.create({
     color: WARM_THEME.textPrimary,
     backgroundColor: WARM_THEME.background,
   },
+  searchBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    padding: 6,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    borderRadius: 14,
+    backgroundColor: WARM_THEME.surface,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    fontSize: 14,
+    color: WARM_THEME.textPrimary,
+  },
+  quickClearButton: {
+    minWidth: 60,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickClearButtonText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: WARM_THEME.accent,
+  },
   wrapRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -874,18 +1033,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   pill: {
-    paddingVertical: 7,
-    paddingHorizontal: 12,
+    minWidth: 84,
+    minHeight: 44,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
     borderRadius: WARM_THEME.radiusPill,
     borderWidth: 1,
     borderColor: WARM_THEME.border,
     backgroundColor: WARM_THEME.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
   },
   pillActive: {
     backgroundColor: WARM_THEME.accent,
     borderColor: WARM_THEME.accent,
   },
   pillText: {
+    flex: 1,
+    minWidth: 0,
     fontSize: 12,
     fontWeight: "700",
     color: WARM_THEME.textPrimary,
@@ -944,13 +1109,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   listBox: {
-    gap: 5,
+    gap: 8,
     paddingTop: 4,
   },
-  listItem: {
+  stagedItemRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  stagedItemCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  stagedItemName: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     color: WARM_THEME.textPrimary,
+  },
+  stagedMetadataRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  stagedMetadataPill: {
+    maxWidth: "100%",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+  },
+  stagedMetadataText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    fontWeight: "700",
+    color: WARM_THEME.textSecondary,
   },
   statusText: {
     fontSize: 12,
