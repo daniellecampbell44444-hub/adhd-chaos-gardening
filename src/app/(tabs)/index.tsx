@@ -8,6 +8,7 @@ import { WarmBannerCard } from '../../components/WarmBannerCard';
 import {
   useGarden,
   type BatchCareAction,
+  type GardenLogCategory,
   type KitchenLogOutcome,
 } from '../../context/GardenContext';
 import { useAdminAccess } from '../../utils/adminAccess';
@@ -37,6 +38,13 @@ const KITCHEN_OUTCOMES: KitchenLogOutcome[] = [
   'Pickled',
   'Canned',
   'Batch',
+];
+const GARDEN_LOG_CATEGORIES: GardenLogCategory[] = [
+  'Watering',
+  'Feeding',
+  'Pest/Issue',
+  'Pruning/Repotting',
+  'Seed/Sowing',
 ];
 
 function describeWeather(code: number) {
@@ -554,6 +562,7 @@ export default function PulseScreen() {
     signUp, signIn, signOut, waterAll, feedAll, addHarvest, deleteHarvest, clearAllHarvests, addExpense,
     toggleReminder, catchUpReminders, loadSampleGarden, batchCareLogs, logBatchCare, clearBatchCareLogs,
     harvestKitchenLogs, addHarvestKitchenLog, deleteHarvestKitchenLog, clearHarvestKitchenLogs,
+    unifiedGardenLogs, addUnifiedGardenLog, deleteUnifiedGardenLog, clearUnifiedGardenLogs,
   } = useGarden();
 
   const {
@@ -580,6 +589,11 @@ export default function PulseScreen() {
   const [kitchenQuantity, setKitchenQuantity] = useState('');
   const [kitchenNotes, setKitchenNotes] = useState('');
   const [kitchenOutcome, setKitchenOutcome] = useState<KitchenLogOutcome>('Fresh');
+  const [gardenLogCategory, setGardenLogCategory] = useState<GardenLogCategory>('Watering');
+  const [gardenLogContext, setGardenLogContext] = useState('');
+  const [gardenLogNote, setGardenLogNote] = useState('');
+  const [gardenLogFilter, setGardenLogFilter] = useState<'All' | GardenLogCategory>('All');
+  const [gardenLogSearch, setGardenLogSearch] = useState('');
   const [crop, setCrop] = useState('');
 const HARVEST_PLANT_CHIPS = Array.from(new Set(plants.map(p => (p.variety ? `${p.variety} ${p.name}` : p.name).trim()))).filter(Boolean).slice(0, 12);
   const [grams, setGrams] = useState('');
@@ -766,6 +780,22 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
   const lowSeedItems = seeds.filter(
     s => !s.wishlist && (s.packets <= 1 || s.approxSeeds <= 15)
   );
+  const gardenLogQuery = gardenLogSearch.trim().toLowerCase();
+  const filteredUnifiedGardenLogs = unifiedGardenLogs
+    .filter(entry => {
+      const matchesCategory =
+        gardenLogFilter === 'All' || entry.category === gardenLogFilter;
+      const matchesSearch =
+        !gardenLogQuery ||
+        [entry.category, entry.context ?? '', entry.note ?? '']
+          .join(' ')
+          .toLowerCase()
+          .includes(gardenLogQuery);
+      return matchesCategory && matchesSearch;
+    })
+    .sort(
+      (a, b) => new Date(b.loggedAt).getTime() - new Date(a.loggedAt).getTime()
+    );
 
   // Keep a candidate pool so the card can rotate through only three at a time.
   const focusItems: { id: string; label: string; meta: string; onPress: () => void }[] = [];
@@ -871,6 +901,28 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
         },
       ]
     );
+  };
+
+  const saveUnifiedGardenLog = () => {
+    addUnifiedGardenLog(gardenLogCategory, gardenLogContext, gardenLogNote);
+    setGardenLogContext('');
+    setGardenLogNote('');
+  };
+
+  const confirmClearUnifiedGardenLogs = () => {
+    Alert.alert(
+      'Clear unified garden log?',
+      'This removes all unified garden log entries.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Clear log', style: 'destructive', onPress: clearUnifiedGardenLogs },
+      ]
+    );
+  };
+
+  const resetUnifiedGardenFilters = () => {
+    setGardenLogFilter('All');
+    setGardenLogSearch('');
   };
 
   const saveExpense = () => {
@@ -1534,6 +1586,205 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           </View>
         </View>
       )}
+
+      <View style={styles.unifiedGardenLogCard}>
+        <View style={styles.unifiedLogHeader}>
+          <View style={styles.unifiedLogHeaderCopy}>
+            <Text style={styles.unifiedLogEyebrow}>GARDEN ACTIVITY</Text>
+            <Text style={styles.unifiedLogTitle}>Unified garden log</Text>
+          </View>
+          <Ionicons name="book-outline" size={22} color={WARM_THEME.accentWarm} />
+        </View>
+        <Text style={styles.unifiedLogDescription}>
+          Keep watering, feeding, issues, pruning, and sowing notes together.
+        </Text>
+
+        <Text style={styles.unifiedLogFieldLabel}>Entry type</Text>
+        <View style={styles.unifiedLogCategoryPills}>
+          {GARDEN_LOG_CATEGORIES.map(category => {
+            const isSelected = gardenLogCategory === category;
+            return (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.unifiedLogCategoryPill,
+                  isSelected && styles.unifiedLogCategoryPillSelected,
+                ]}
+                onPress={() => setGardenLogCategory(category)}
+                activeOpacity={0.76}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`Choose ${category} entry type`}
+              >
+                <Text
+                  style={[
+                    styles.unifiedLogCategoryText,
+                    isSelected && styles.unifiedLogCategoryTextSelected,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <TextInput
+          style={styles.unifiedLogInput}
+          value={gardenLogContext}
+          onChangeText={setGardenLogContext}
+          placeholder="Plant, bed, or zone (optional)"
+          placeholderTextColor={WARM_THEME.textSecondary}
+          accessibilityLabel="Optional plant, bed, or zone"
+          returnKeyType="next"
+        />
+        <TextInput
+          style={[styles.unifiedLogInput, styles.unifiedLogNoteInput]}
+          value={gardenLogNote}
+          onChangeText={setGardenLogNote}
+          placeholder="Note (optional)"
+          placeholderTextColor={WARM_THEME.textSecondary}
+          accessibilityLabel="Optional garden log note"
+          multiline
+          textAlignVertical="top"
+        />
+        <TouchableOpacity
+          style={styles.unifiedLogSubmitButton}
+          onPress={saveUnifiedGardenLog}
+          activeOpacity={0.78}
+          accessibilityRole="button"
+          accessibilityLabel={`Log ${gardenLogCategory} garden entry`}
+        >
+          <Ionicons name="add-circle-outline" size={18} color={WARM_THEME.accentText} />
+          <Text style={styles.unifiedLogSubmitText}>Log garden entry</Text>
+        </TouchableOpacity>
+
+        <View style={styles.unifiedLogRecentHeader}>
+          <Text style={styles.unifiedLogRecentTitle}>
+            Recent entries ({unifiedGardenLogs.length})
+          </Text>
+          {unifiedGardenLogs.length > 0 && (
+            <TouchableOpacity
+              style={styles.unifiedLogClearButton}
+              onPress={confirmClearUnifiedGardenLogs}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Clear unified garden log"
+            >
+              <Text style={styles.unifiedLogClearText}>Clear log</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.unifiedLogSearchRow}>
+          <Ionicons name="search-outline" size={17} color={WARM_THEME.textSecondary} />
+          <TextInput
+            style={styles.unifiedLogSearchInput}
+            value={gardenLogSearch}
+            onChangeText={setGardenLogSearch}
+            placeholder="Search category, plant, zone, or note"
+            placeholderTextColor={WARM_THEME.textSecondary}
+            accessibilityLabel="Search garden log"
+            returnKeyType="search"
+          />
+          {gardenLogSearch.length > 0 && (
+            <TouchableOpacity
+              style={styles.unifiedLogSearchClear}
+              onPress={() => setGardenLogSearch('')}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel="Clear garden log search"
+            >
+              <Ionicons name="close-circle" size={18} color={WARM_THEME.accent} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <View style={styles.unifiedLogFilterPills}>
+          {(['All', ...GARDEN_LOG_CATEGORIES] as const).map(category => {
+            const isSelected = gardenLogFilter === category;
+            return (
+              <TouchableOpacity
+                key={category}
+                style={[
+                  styles.unifiedLogFilterPill,
+                  isSelected && styles.unifiedLogFilterPillSelected,
+                ]}
+                onPress={() => setGardenLogFilter(category)}
+                activeOpacity={0.76}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`Filter garden log by ${category}`}
+              >
+                <Text
+                  style={[
+                    styles.unifiedLogFilterText,
+                    isSelected && styles.unifiedLogFilterTextSelected,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {filteredUnifiedGardenLogs.length > 0 ? (
+          <View style={styles.unifiedLogList}>
+            {filteredUnifiedGardenLogs.map(entry => (
+              <View key={entry.id} style={styles.unifiedLogRow}>
+                <View style={styles.unifiedLogEntryCopy}>
+                  {entry.context ? (
+                    <Text style={styles.unifiedLogContext}>{entry.context}</Text>
+                  ) : null}
+                  {entry.note ? (
+                    <Text style={styles.unifiedLogNote}>{entry.note}</Text>
+                  ) : null}
+                  <Text style={styles.unifiedLogTimestamp}>
+                    {formatLocalLogTimestamp(entry.loggedAt)}
+                  </Text>
+                </View>
+                <View style={styles.unifiedLogEntryCategoryPill}>
+                  <Text style={styles.unifiedLogEntryCategoryText}>{entry.category}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.unifiedLogDeleteButton}
+                  onPress={() => deleteUnifiedGardenLog(entry.id)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${entry.category} log entry`}
+                >
+                  <Ionicons name="trash-outline" size={16} color={WARM_THEME.accent} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.unifiedLogEmptyCard}>
+            <Ionicons name="leaf-outline" size={20} color={WARM_THEME.accentWarm} />
+            <View style={styles.unifiedLogEmptyCopy}>
+              <Text style={styles.unifiedLogEmptyTitle}>
+                {unifiedGardenLogs.length === 0
+                  ? 'Your garden notes will appear here.'
+                  : 'No entries match those filters.'}
+              </Text>
+              <Text style={styles.unifiedLogEmptyText}>
+                {unifiedGardenLogs.length === 0
+                  ? 'Add a quick activity above to start your garden timeline.'
+                  : 'Try a different category or search term.'}
+              </Text>
+            </View>
+            {unifiedGardenLogs.length > 0 && (
+              <TouchableOpacity
+                style={styles.unifiedLogResetButton}
+                onPress={resetUnifiedGardenFilters}
+                activeOpacity={0.76}
+                accessibilityRole="button"
+                accessibilityLabel="Reset garden log filters"
+              >
+                <Text style={styles.unifiedLogResetText}>Reset filters</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
 
       {surplusHarvests.length > 0 && (
         <View style={styles.pantryCard}>
@@ -2587,6 +2838,288 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
     color: WARM_THEME.textSecondary,
+  },
+  unifiedGardenLogCard: {
+    gap: 12,
+    padding: 16,
+    borderRadius: WARM_THEME.radiusCard,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+    ...cardShadow,
+  },
+  unifiedLogHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  unifiedLogHeaderCopy: { flex: 1, minWidth: 0, gap: 3 },
+  unifiedLogEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    color: WARM_THEME.accentWarm,
+  },
+  unifiedLogTitle: { fontSize: 17, fontWeight: '800', color: WARM_THEME.textPrimary },
+  unifiedLogDescription: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: WARM_THEME.textSecondary,
+  },
+  unifiedLogFieldLabel: { fontSize: 12, fontWeight: '800', color: WARM_THEME.textPrimary },
+  unifiedLogCategoryPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  unifiedLogCategoryPill: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    maxWidth: '100%',
+    minHeight: 40,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  unifiedLogCategoryPillSelected: {
+    borderColor: WARM_THEME.accent,
+    backgroundColor: WARM_THEME.accent,
+  },
+  unifiedLogCategoryText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+    color: WARM_THEME.textPrimary,
+  },
+  unifiedLogCategoryTextSelected: { color: WARM_THEME.accentText },
+  unifiedLogInput: {
+    minHeight: 46,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+    color: WARM_THEME.textPrimary,
+    fontSize: 13,
+  },
+  unifiedLogNoteInput: { minHeight: 74 },
+  unifiedLogSubmitButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: WARM_THEME.accent,
+  },
+  unifiedLogSubmitText: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: '800',
+    color: WARM_THEME.accentText,
+  },
+  unifiedLogRecentHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 2,
+  },
+  unifiedLogRecentTitle: { fontSize: 12, fontWeight: '800', color: WARM_THEME.textPrimary },
+  unifiedLogClearButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  unifiedLogClearText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+    color: WARM_THEME.accent,
+  },
+  unifiedLogSearchRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 46,
+    paddingHorizontal: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+  },
+  unifiedLogSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 10,
+    color: WARM_THEME.textPrimary,
+    fontSize: 12,
+  },
+  unifiedLogSearchClear: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unifiedLogFilterPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  unifiedLogFilterPill: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    maxWidth: '100%',
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surfaceMuted,
+  },
+  unifiedLogFilterPillSelected: {
+    borderColor: WARM_THEME.accentWarm,
+    backgroundColor: WARM_THEME.accentWarm,
+  },
+  unifiedLogFilterText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    fontWeight: '700',
+    color: WARM_THEME.textPrimary,
+  },
+  unifiedLogFilterTextSelected: { color: WARM_THEME.textPrimary },
+  unifiedLogList: { gap: 8 },
+  unifiedLogRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+  },
+  unifiedLogEntryCopy: { flex: 1, minWidth: 0, gap: 3 },
+  unifiedLogContext: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  unifiedLogNote: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    lineHeight: 15,
+    color: WARM_THEME.textSecondary,
+  },
+  unifiedLogTimestamp: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    color: WARM_THEME.textSecondary,
+  },
+  unifiedLogEntryCategoryPill: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    maxWidth: '100%',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.accentSoft,
+  },
+  unifiedLogEntryCategoryText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 10,
+    fontWeight: '800',
+    color: WARM_THEME.accent,
+  },
+  unifiedLogDeleteButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+  },
+  unifiedLogEmptyCard: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 9,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.background,
+  },
+  unifiedLogEmptyCopy: { flex: 1, minWidth: 0, gap: 3 },
+  unifiedLogEmptyTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    fontWeight: '800',
+    color: WARM_THEME.textPrimary,
+  },
+  unifiedLogEmptyText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    lineHeight: 15,
+    color: WARM_THEME.textSecondary,
+  },
+  unifiedLogResetButton: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+    paddingHorizontal: 11,
+    borderRadius: WARM_THEME.radiusPill,
+    borderWidth: 1,
+    borderColor: WARM_THEME.border,
+    backgroundColor: WARM_THEME.surface,
+  },
+  unifiedLogResetText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 11,
+    fontWeight: '700',
+    color: WARM_THEME.accent,
   },
   pantryCard: {
     backgroundColor: WARM_THEME.surface,
