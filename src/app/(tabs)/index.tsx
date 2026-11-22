@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Share } from 'react-native';
 import { AdminConsoleScreen } from '../../components/AdminConsoleScreen';
+import { GardenInsightsChartCard } from '../../components/GardenInsightsChartCard';
 import { SubscriptionScreen } from '../../components/SubscriptionScreen';
 import { WarmBannerCard } from '../../components/WarmBannerCard';
 import {
@@ -558,7 +559,7 @@ export default function PulseScreen() {
       };
 
   const {
-    plants, harvests, expenses, reminders, seeds, user, syncStatus,
+    plants, harvests, expenses, reminders, seeds, soilLogs, user, syncStatus,
     signUp, signIn, signOut, waterAll, feedAll, addHarvest, deleteHarvest, clearAllHarvests, addExpense,
     toggleReminder, catchUpReminders, loadSampleGarden, batchCareLogs, logBatchCare, clearBatchCareLogs,
     harvestKitchenLogs, addHarvestKitchenLog, deleteHarvestKitchenLog, clearHarvestKitchenLogs,
@@ -780,6 +781,15 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
   const lowSeedItems = seeds.filter(
     s => !s.wishlist && (s.packets <= 1 || s.approxSeeds <= 15)
   );
+  const careActivityTimestamps = [
+    ...unifiedGardenLogs.map(entry => entry.loggedAt),
+    ...batchCareLogs.map(entry => entry.loggedAt),
+    ...soilLogs.map(entry => entry.date),
+  ];
+  const kitchenOutcomeCounts = KITCHEN_OUTCOMES.map(outcome => ({
+    outcome,
+    count: harvestKitchenLogs.filter(entry => entry.outcome === outcome).length,
+  }));
   const gardenLogQuery = gardenLogSearch.trim().toLowerCase();
   const filteredUnifiedGardenLogs = unifiedGardenLogs
     .filter(entry => {
@@ -1785,6 +1795,13 @@ const QUICK_HARVEST_WEIGHTS = [{"label":"100g","grams":100},{"label":"250g","gra
           </View>
         )}
       </View>
+
+      <GardenInsightsChartCard
+        careActivityTimestamps={careActivityTimestamps}
+        kitchenOutcomeCounts={kitchenOutcomeCounts}
+        canViewKitchenOutcomes={hasKitchenLogAccess}
+        onUpgradePress={() => setShowSubscription(true)}
+      />
 
       {surplusHarvests.length > 0 && (
         <View style={styles.pantryCard}>
